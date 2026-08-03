@@ -984,7 +984,21 @@ const Jobs = {
 
     let raw = '';
     try {
-      const dataUrl = await Util.compressImage(file, 1024, 0.8);
+      // 长图检测：宽高比超过 3:1 的图减少压缩，保留更多细节
+      let isTall = false;
+      try {
+        const tmpImg = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error('load failed'));
+          img.src = URL.createObjectURL(file);
+        });
+        isTall = tmpImg.height / tmpImg.width > 3;
+        URL.revokeObjectURL(tmpImg.src);
+      } catch {}
+      const maxW = isTall ? 1600 : 1024;
+      const quality = isTall ? 0.92 : 0.8;
+      const dataUrl = await Util.compressImage(file, maxW, quality);
       const base64 = dataUrl.split(',')[1];
 
       const resp = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
@@ -995,7 +1009,9 @@ const Jobs = {
           messages: [{
             role: 'user',
             content: [
-              { type: 'text', text: '这是一张招聘信息的截图。请提取以下信息，以 JSON 格式返回：{"company":"公司名称","position":"岗位名称","salary":"薪资范围","requirements":"核心要求摘要（50字以内）"}。如果有信息缺失，对应字段填空字符串。只返回 JSON，不要其他内容。' },
+              { type: 'text', text: isTall
+                ? '这是一张较长的招聘信息截图，可能包含多个岗位或详细职位描述。请仔细阅读所有文字，提取第一个/主要的岗位信息，以 JSON 格式返回：{"company":"公司名称","position":"岗位名称","salary":"薪资范围","requirements":"核心要求摘要（80字以内）"}。如果有信息缺失，对应字段填空字符串。只返回 JSON，不要其他内容。'
+                : '这是一张招聘信息的截图。请提取以下信息，以 JSON 格式返回：{"company":"公司名称","position":"岗位名称","salary":"薪资范围","requirements":"核心要求摘要（50字以内）"}。如果有信息缺失，对应字段填空字符串。只返回 JSON，不要其他内容。' },
               { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } }
             ]
           }],
