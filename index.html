@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  橙子的工作台                                                 ║
+  ║  由 不一书个人工作台生成器 (bys-personal-dashboard) 生成       ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║  改这个文件时请遵守：                                          ║
+  ║  1. 每个功能必须被分区标记包裹，且 START 和 END 的功能名        ║
+  ║     必须一字不差（HTML 和 JS 两处都要）                        ║
+  ║  2. 数据读写只走 Store.*，不要直接碰 localStorage             ║
+  ║  3. 输入框 font-size 不能小于 16px                            ║
+  ║  4. 敏感数据（API key）走 Store.setSecret，不进备份            ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>橙子的工作台</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="橙子">
+<meta name="theme-color" content="#f5f0e8">
+
+<style>
+/* ==== 主题变量：暖棕·日系 ==== */
+:root{
+  --bg:#ebe3d9;
+  --sidebar:#f5f0e8;
+  --sidebar-text:#6b5f52;
+  --sidebar-active:#2d2620;
+  --card:#ffffff;
+  --text:#3d352c;
+  --text-dim:#9c8f80;
+  --accent:#2d2620;
+  --radius:14px;
+  --shadow:0 2px 10px rgba(120,100,80,.08);
+  --font:-apple-system,"PingFang SC",system-ui,sans-serif;
+}
+
+/* ==== 基础 ==== */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:var(--font);background:var(--bg);color:var(--text);
+  overflow:hidden;
+}
+.app{display:flex;height:100%}
+
+/* ==== 侧边栏：常驻窄条 ==== */
+.side{
+  width:76px;flex-shrink:0;background:var(--sidebar);
+  display:flex;flex-direction:column;
+  padding:calc(12px + env(safe-area-inset-top,0)) 6px calc(12px + env(safe-area-inset-bottom,0));
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.side::-webkit-scrollbar{display:none}
+.brand{text-align:center;margin-bottom:14px;flex-shrink:0}
+.brand .logo{font-size:26px;line-height:1}
+.brand .name{font-size:11px;color:var(--sidebar-text);opacity:.85;margin-top:4px;line-height:1.3;word-break:break-all}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{
+  border:none;background:transparent;font-family:inherit;
+  padding:10px 2px;border-radius:12px;
+  color:var(--sidebar-text);font-size:11px;line-height:1.3;
+}
+.nav button .ico{display:block;font-size:21px;margin-bottom:3px}
+.nav button.on{background:var(--sidebar-active);color:#fff}
+
+/* ==== 内容区 ==== */
+.main{
+  flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:calc(14px + env(safe-area-inset-top,0)) 12px calc(28px + env(safe-area-inset-bottom,0));
+}
+.page{display:none;flex-direction:column;gap:12px}
+.page.on{display:flex}
+.page-title{font-size:22px;font-weight:600;margin-bottom:2px}
+.page-sub{font-size:13px;color:var(--text-dim);margin-top:-8px;margin-bottom:2px}
+
+/* ==== 卡片 ==== */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.card h2{font-size:17px;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.hint{font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.5}
+.empty{font-size:13px;color:var(--text-dim);text-align:center;padding:18px 0}
+
+/* ==== 表单 ==== */
+input,textarea,select{
+  width:100%;font-size:16px;font-family:inherit;color:var(--text);
+  padding:11px 13px;border:1px solid rgba(128,128,128,.28);
+  border-radius:calc(var(--radius) - 6px);background:transparent;
+}
+textarea{min-height:88px;resize:vertical;line-height:1.6}
+input::placeholder,textarea::placeholder{color:var(--text-dim)}
+.btn{
+  padding:11px 18px;font-size:15px;font-family:inherit;white-space:nowrap;
+  border:none;border-radius:calc(var(--radius) - 6px);
+  background:var(--accent);color:#fff;cursor:pointer;
+}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid rgba(128,128,128,.3)}
+.btn.danger{background:#d9534f}
+.btn:active{opacity:.75}
+.row{display:flex;gap:8px;align-items:center}
+.row .btn{flex-shrink:0}
+
+/* ==== 列表 ==== */
+.item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px dashed rgba(128,128,128,.22)}
+.item:last-child{border-bottom:none}
+.item .grow{flex:1;min-width:0}
+.item .del{color:var(--text-dim);font-size:16px;background:none;border:none;padding:0 4px;flex-shrink:0;cursor:pointer}
+.box{
+  width:21px;height:21px;flex-shrink:0;margin-top:1px;
+  border:2px solid var(--accent);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:#fff;background:transparent;
+}
+.item.done .box{background:var(--accent)}
+.item.done .grow{text-decoration:line-through;color:var(--text-dim)}
+
+/* ==== 提示条 ==== */
+.banner{
+  background:var(--accent);color:#fff;padding:11px 14px;
+  border-radius:var(--radius);font-size:13px;line-height:1.5;
+  display:flex;align-items:center;gap:10px;
+}
+.banner button{
+  margin-left:auto;flex-shrink:0;background:rgba(255,255,255,.22);color:#fff;
+  border:none;padding:6px 12px;border-radius:8px;font-size:13px;font-family:inherit;
+}
+.toast{
+  position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0));
+  transform:translateX(-50%);z-index:99;
+  background:rgba(0,0,0,.82);color:#fff;padding:10px 18px;border-radius:20px;
+  font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.toast.on{opacity:1}
+
+/* ==== 分类标签 ==== */
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tags button{
+  padding:6px 12px;font-size:13px;font-family:inherit;
+  border:1px solid rgba(128,128,128,.22);border-radius:20px;
+  background:transparent;color:var(--text);cursor:pointer;
+}
+.tags button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ==== 卡片内列表 ==== */
+.card-list{font-size:14px;line-height:1.7}
+.card-list li{margin-bottom:6px}
+.card-list a{color:var(--accent)}
+
+/* ==== 状态徽标 ==== */
+.badge{
+  display:inline-block;padding:3px 8px;border-radius:10px;
+  font-size:11px;font-weight:500;
+}
+.badge.pending{background:rgba(128,128,128,.15);color:var(--text-dim)}
+.badge.sent{background:rgba(45,38,32,.12);color:var(--accent)}
+.badge.interview{background:#d4a37333;color:#8b6914}
+.badge.done{background:rgba(76,175,80,.15);color:#388e3c}
+
+/* ==== 加载动画 ==== */
+.spin{display:inline-block;width:20px;height:20px;border:2px solid rgba(128,128,128,.2);border-top-color:var(--accent);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loading{text-align:center;padding:24px;color:var(--text-dim);font-size:14px}
+.loading .spin{margin-right:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ==== 侧边栏 START ==== -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">🍊</div>
+      <div class="name">橙子的工作台</div>
+    </div>
+    <nav class="nav" id="nav">
+      <!-- 由 App.routes 自动渲染 -->
+    </nav>
+  </aside>
+  <!-- ==== 侧边栏 END ==== -->
+
+  <main class="main" id="main">
+
+    <!-- ==== 功能：三件事 START ==== -->
+    <section class="page" id="page-things">
+      <div class="page-title">每日三件事</div>
+      <div class="page-sub" id="thingsDate"></div>
+
+      <div class="card">
+        <h2>📋 今天要做的三件事</h2>
+        <div id="tasksList"></div>
+        <div class="row" style="margin-top:10px">
+          <input type="text" id="taskInput" placeholder="加一件事…">
+          <button class="btn" onclick="Things.addTask()">添加</button>
+        </div>
+        <p class="hint" id="taskHint"></p>
+      </div>
+
+      <div class="card">
+        <h2>📝 随笔 · 心情感悟</h2>
+        <textarea id="journalInput" placeholder="今天想写点什么……"></textarea>
+        <p class="hint" id="journalHint">自动保存中，放心写</p>
+      </div>
+    </section>
+    <!-- ==== 功能：三件事 END ==== -->
+
+    <!-- ==== 功能：记账 START ==== -->
+    <section class="page" id="page-money">
+      <div class="page-title">记账</div>
+
+      <div class="card">
+        <h2>💰 记一笔</h2>
+        <div class="row">
+          <input type="number" id="moneyAmount" placeholder="金额" style="flex:1">
+          <input type="text" id="moneyNote" placeholder="备注（选填）" style="flex:2">
+        </div>
+        <div class="tags" id="moneyCats"></div>
+        <div class="row" id="moneyTypeRow">
+          <button class="btn" id="btnOut" onclick="Money.setType('out')" style="flex:1">支出</button>
+          <button class="btn ghost" id="btnIn" onclick="Money.setType('in')" style="flex:1">收入</button>
+        </div>
+        <button class="btn" onclick="Money.add()" style="width:100%;margin-top:6px">记一笔</button>
+      </div>
+
+      <div class="card">
+        <h2>📊 本月概览</h2>
+        <div id="moneySummary"></div>
+      </div>
+
+      <div class="card">
+        <h2>📋 最近记录</h2>
+        <div id="moneyList"></div>
+      </div>
+    </section>
+    <!-- ==== 功能：记账 END ==== -->
+
+    <!-- ==== 功能：考试日历 START ==== -->
+    <section class="page" id="page-exam">
+      <div class="page-title">考试日历</div>
+      <div class="row" style="margin-bottom:4px">
+        <button class="btn" id="examTabRef" onclick="Exam.switchTab('ref')">📋 参考资料</button>
+        <button class="btn ghost" id="examTabNote" onclick="Exam.switchTab('note')">📝 我的笔记</button>
+      </div>
+      <div class="page-sub">参考资料由AI定期更新 · 你的笔记永远存在手机里，不会被覆盖</div>
+      <div id="examRef"></div>
+      <div id="examNote" style="display:none"></div>
+    </section>
+    <!-- ==== 功能：考试日历 END ==== -->
+
+    <!-- ==== 功能：投递追踪 START ==== -->
+    <section class="page" id="page-jobs">
+      <div class="page-title">投递追踪</div>
+
+      <div class="card">
+        <h2>📸 截图识别岗位</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">
+          上传招聘截图，AI 自动提取岗位信息
+        </p>
+        <div class="row">
+          <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="Jobs.uploadScreenshot(this)">
+          <button class="btn" onclick="document.getElementById('screenshotInput').click()">📎 上传截图识别</button>
+        </div>
+        <p class="hint" id="screenshotHint"></p>
+        <div id="ocrResult" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <h2>📋 投递记录</h2>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn ghost" onclick="Jobs.showAddForm()" style="width:100%">+ 手动添加</button>
+        </div>
+        <div id="jobsList"></div>
+      </div>
+    </section>
+    <!-- ==== 功能：投递追踪 END ==== -->
+
+    <!-- ==== 功能：选题灵感 START ==== -->
+    <section class="page" id="page-ideas">
+      <div class="page-title">选题灵感</div>
+      <div class="page-sub">小红书热点 · 流量扶持 · 选题方向</div>
+      <div id="ideasContent"></div>
+    </section>
+    <!-- ==== 功能：选题灵感 END ==== -->
+
+    <!-- ==== 功能：转行分析 START ==== -->
+    <section class="page" id="page-career">
+      <div class="page-title">转行方向分析</div>
+      <div class="page-sub">基于你的背景 · 适配方向与切入路径</div>
+      <div id="careerContent"></div>
+    </section>
+    <!-- ==== 功能：转行分析 END ==== -->
+
+    <!-- ==== 功能：复盘 START ==== -->
+    <section class="page" id="page-review">
+      <div class="page-title">每周复盘</div>
+      <div class="page-sub" id="reviewDate"></div>
+      <div id="reviewContent"></div>
+    </section>
+    <!-- ==== 功能：复盘 END ==== -->
+
+    <!-- ==== 功能：设置 START ==== -->
+    <section class="page" id="page-settings">
+      <div class="page-title">设置</div>
+
+      <div class="card">
+        <h2>💾 数据备份</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:12px">
+          你的所有数据都存在这台手机的浏览器里，不在任何服务器上。<br>
+          换手机、清理浏览器数据前，记得先导出备份。
+        </p>
+        <div class="row">
+          <button class="btn" onclick="Store.exportFile()">导出备份</button>
+          <button class="btn ghost" onclick="document.getElementById('importFile').click()">恢复备份</button>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="Store.importFile(this)">
+        <p class="hint" id="backupInfo"></p>
+      </div>
+
+      <div class="card" id="apiCard">
+        <h2>🔑 接口配置</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:12px">
+          填在这里的 key 只保存在你自己的手机上，不会上传，也<b>不会被导出到备份文件里</b>。
+        </p>
+        <div style="margin-bottom:12px">
+          <label style="font-size:14px;display:block;margin-bottom:6px">DeepSeek API Key</label>
+          <input type="password" id="key_deepseek" placeholder="粘贴你的 key">
+          <p class="hint">在 platform.deepseek.com 注册后，「API Keys」里创建一个。用于截图识别岗位信息。</p>
+        </div>
+        <button class="btn" onclick="Settings.saveKeys()">保存</button>
+      </div>
+
+      <div class="card">
+        <h2>⚠️ 危险操作</h2>
+        <button class="btn danger" onclick="Store.wipe()">清空所有数据</button>
+        <p class="hint">清空前请确认已经导出过备份，这个操作无法撤销。</p>
+      </div>
+
+      <div class="card">
+        <p class="hint" style="margin:0;text-align:center">
+          橙子的工作台<br>
+          <span style="opacity:.6">由 不一书个人工作台生成器 生成</span>
+        </p>
+      </div>
+    </section>
+    <!-- ==== 功能：设置 END ==== -->
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 手动添加岗位的弹层 -->
+<div id="jobFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;align-items:flex-end;justify-content:center"
+     onclick="if(event.target===this) Jobs.closeAddForm()">
+  <div style="background:var(--card);width:100%;max-width:500px;border-radius:var(--radius) var(--radius) 0 0;padding:20px;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:14px">添加岗位</h3>
+    <input type="text" id="jobCompany" placeholder="公司名称" style="margin-bottom:8px">
+    <input type="text" id="jobPosition" placeholder="岗位名称" style="margin-bottom:8px">
+    <input type="text" id="jobSalary" placeholder="薪资范围" style="margin-bottom:8px">
+    <input type="text" id="jobReq" placeholder="核心要求（选填）" style="margin-bottom:8px">
+    <input type="text" id="jobDeadline" placeholder="截止日期（选填）" style="margin-bottom:8px">
+    <textarea id="jobNote" placeholder="备注（选填）" style="min-height:60px;margin-bottom:12px"></textarea>
+    <div class="row">
+      <button class="btn ghost" onclick="Jobs.closeAddForm()" style="flex:1">取消</button>
+      <button class="btn" onclick="Jobs.addManual()" style="flex:1">添加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Store · 存储抽象层
+   所有数据读写都必须走这里，不要直接用 localStorage。
+   ═══════════════════════════════════════════════════════════ */
+const Store = (() => {
+  const NS  = 'bysdash:';
+  const SEC = 'bysdash$secret:';
+
+  const driver = {
+    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k,v){
+      try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+      catch(e){
+        UI.toast('存储空间满了，请到设置里导出备份后清理旧数据');
+        console.error(e); return false;
+      }
+    },
+    remove(k){ localStorage.removeItem(k); },
+    keys(){ return Object.keys(localStorage); }
+  };
+
+  return {
+    get(key, fallback = null){
+      const v = driver.get(NS + key);
+      return v === null || v === undefined ? fallback : v;
+    },
+    set(key, val){
+      const ok = driver.set(NS + key, val);
+      if (ok) driver.set(NS + '_lastWrite', Date.now());
+      return ok;
+    },
+    remove(key){ driver.remove(NS + key); },
+
+    getDaily(key, fallback = null){ return this.get(key + ':' + Util.today(), fallback); },
+    setDaily(key, val){ return this.set(key + ':' + Util.today(), val); },
+
+    getSecret(key){ return driver.get(SEC + key); },
+    setSecret(key, val){ return driver.set(SEC + key, val); },
+
+    exportAll(){
+      const data = {};
+      driver.keys().filter(k => k.startsWith(NS)).forEach(k => {
+        data[k.slice(NS.length)] = driver.get(k);
+      });
+      return { app:'橙子的工作台', version:1, exportedAt:new Date().toISOString(), data };
+    },
+
+    exportFile(){
+      const blob = new Blob([JSON.stringify(this.exportAll(), null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '橙子备份-' + Util.today() + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      this.set('_lastBackup', Date.now());
+      UI.toast('已导出，建议转发到微信文件传输助手存一份');
+      Settings.refreshBackupInfo();
+    },
+
+    importFile(input){
+      const f = input.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = e => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed.data) throw new Error('格式不对');
+          if (!confirm('恢复备份会覆盖当前所有数据，确定吗？')) return;
+          Object.entries(parsed.data).forEach(([k,v]) => driver.set(NS + k, v));
+          UI.toast('恢复成功，正在重新加载');
+          setTimeout(() => location.reload(), 900);
+        } catch(err){
+          UI.toast('文件读不了，可能不是备份文件');
+        }
+      };
+      r.readAsText(f);
+      input.value = '';
+    },
+
+    wipe(){
+      if (!confirm('确定清空所有数据？这个操作无法撤销。')) return;
+      if (!confirm('再确认一次：真的要清空吗？')) return;
+      driver.keys().filter(k => k.startsWith(NS)).forEach(k => driver.remove(k));
+      location.reload();
+    }
+  };
+})();
+
+
+/* ═══════════════════════════════════════════════════════════
+   Util · 工具
+   ═══════════════════════════════════════════════════════════ */
+const Util = {
+  today(){
+    const d = new Date();
+    return d.getFullYear() + '-' +
+           String(d.getMonth()+1).padStart(2,'0') + '-' +
+           String(d.getDate()).padStart(2,'0');
+  },
+  uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); },
+  esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+
+  compressImage(file, maxW = 800, quality = .72){
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const cv = document.createElement('canvas');
+        cv.width  = img.width  * scale;
+        cv.height = img.height * scale;
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', quality));
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   UI · 界面工具
+   ═══════════════════════════════════════════════════════════ */
+const UI = {
+  toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('on');
+    clearTimeout(this._t);
+    this._t = setTimeout(() => t.classList.remove('on'), 2200);
+  },
+  banner(html, pageId = null){
+    const box = document.createElement('div');
+    box.className = 'banner';
+    box.innerHTML = html;
+    const target = pageId ? document.getElementById(pageId) : document.querySelector('.page.on');
+    target?.prepend(box);
+    return box;
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   App · 路由与启动
+   ═══════════════════════════════════════════════════════════ */
+const App = {
+  routes: [
+    { id:'things',   icon:'📋', name:'三件事', onShow: () => Things.render() },
+    { id:'money',    icon:'💰', name:'记账',   onShow: () => Money.render() },
+    { id:'jobs',     icon:'📸', name:'投递',   onShow: () => Jobs.render() },
+    { id:'ideas',    icon:'💡', name:'选题',   onShow: () => Ideas.render() },
+    { id:'exam',     icon:'🎯', name:'考试',   onShow: () => Exam.render() },
+    { id:'career',   icon:'🧭', name:'转行',   onShow: () => Career.render() },
+    { id:'review',   icon:'📊', name:'复盘',   onShow: () => Review.render() },
+    { id:'settings', icon:'⚙️', name:'设置',   onShow: () => Settings.render() }
+  ],
+
+  go(id){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+    document.getElementById('page-' + id)?.classList.add('on');
+    document.querySelectorAll('#nav button').forEach(b =>
+      b.classList.toggle('on', b.dataset.id === id));
+    document.getElementById('main').scrollTop = 0;
+    Store.set('_lastPage', id);
+    this.routes.find(r => r.id === id)?.onShow?.();
+  },
+
+  init(){
+    document.getElementById('nav').innerHTML = this.routes.map(r =>
+      `<button data-id="${r.id}" onclick="App.go('${r.id}')">
+         <span class="ico">${r.icon}</span>${r.name}
+       </button>`).join('');
+
+    const last = Store.get('_lastPage');
+    this.go(this.routes.some(r => r.id === last) ? last : this.routes[0].id);
+    this.checkBackup();
+  },
+
+  checkBackup(){
+    const last = Store.get('_lastBackup');
+    const write = Store.get('_lastWrite');
+    if (!write) return;
+    const days = last ? (Date.now() - last) / 864e5 : 99;
+    if (days < 7) return;
+    const b = UI.banner(
+      `<span>${last ? '已经 ' + Math.floor(days) + ' 天没备份了' : '记得备份一下，数据只在这台手机上'}</span>
+       <button onclick="App.go('settings')">去备份</button>`);
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════
+   Settings · 设置页
+   ═══════════════════════════════════════════════════════════ */
+const Settings = {
+  keys: ['deepseek'],
+
+  render(){
+    this.refreshBackupInfo();
+    this.keys.forEach(k => {
+      const el = document.getElementById('key_' + k);
+      if (el) el.value = Store.getSecret(k) || '';
+    });
+  },
+
+  saveKeys(){
+    this.keys.forEach(k => {
+      const el = document.getElementById('key_' + k);
+      if (el) Store.setSecret(k, el.value.trim());
+    });
+    UI.toast('已保存');
+  },
+
+  refreshBackupInfo(){
+    const last = Store.get('_lastBackup');
+    const el = document.getElementById('backupInfo');
+    if (el) el.textContent = last
+      ? '上次备份：' + new Date(last).toLocaleDateString('zh-CN')
+      : '还没备份过';
+  }
+};
+
+
+/* ==== 功能：三件事 START ==== */
+const Things = {
+  render(){
+    const today = Util.today();
+    document.getElementById('thingsDate').textContent = today;
+    const tasks = Store.getDaily('things', []);
+    const journal = Store.getDaily('journal', '');
+    document.getElementById('journalInput').value = journal;
+
+    const done = tasks.filter(t => t.done).length;
+    const total = tasks.length;
+    document.getElementById('taskHint').textContent = total
+      ? `已完成 ${done}/${total}` + (done === total ? ' 🎉' : '')
+      : '写下今天最重要的三件事';
+
+    document.getElementById('tasksList').innerHTML = tasks.length
+      ? tasks.map((t, i) => `<div class="item${t.done ? ' done' : ''}">
+           <div class="box" onclick="Things.toggle('${t.id}')">${t.done ? '✓' : ''}</div>
+           <span class="grow">${Util.esc(t.text)}</span>
+           <button class="del" onclick="Things.del('${t.id}')">✕</button>
+         </div>`).join('')
+      : '<div class="empty">还没有内容</div>';
+  },
+
+  addTask(){
+    const el = document.getElementById('taskInput');
+    const text = el.value.trim();
+    if (!text) return;
+    const tasks = Store.getDaily('things', []);
+    tasks.push({ id: Util.uid(), text, done: false });
+    Store.setDaily('things', tasks);
+    el.value = '';
+    this.render();
+  },
+
+  toggle(id){
+    const tasks = Store.getDaily('things', []);
+    const t = tasks.find(x => x.id === id);
+    if (t) t.done = !t.done;
+    Store.setDaily('things', tasks);
+    this.render();
+  },
+
+  del(id){
+    let tasks = Store.getDaily('things', []);
+    tasks = tasks.filter(x => x.id !== id);
+    Store.setDaily('things', tasks);
+    this.render();
+  }
+};
+
+// 随笔自动保存（3 秒无输入后保存）
+let _journalTimer;
+document.getElementById('journalInput').addEventListener('input', function(){
+  clearTimeout(_journalTimer);
+  const hint = document.getElementById('journalHint');
+  hint.textContent = '输入中…';
+  _journalTimer = setTimeout(() => {
+    Store.setDaily('journal', this.value);
+    hint.textContent = '已自动保存 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+  }, 1500);
+});
+/* ==== 功能：三件事 END ==== */
+
+
+/* ==== 功能：记账 START ==== */
+const Money = {
+  CATS: ['🍜 吃饭','🚇 交通','🛒 购物','📚 学习','☕ 咖啡','🎮 娱乐','💊 其他'],
+  _type: 'out',
+  _cat: '🍜 吃饭',
+
+  setType(t){ this._type = t;
+    document.getElementById('btnOut').className = t === 'out' ? 'btn' : 'btn ghost';
+    document.getElementById('btnIn').className  = t === 'in'  ? 'btn' : 'btn ghost';
+  },
+
+  render(){
+    // 分类按钮
+    document.getElementById('moneyCats').innerHTML = this.CATS.map(c =>
+      `<button class="tag${this._cat === c ? ' on' : ''}" onclick="Money.pickCat('${c}')">${c}</button>`
+    ).join('');
+
+    const list = Store.get('money', []);
+    // 本月
+    const now = new Date();
+    const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    const monthItems = list.filter(x => (x.date || '').startsWith(thisMonth));
+    const outSum = monthItems.filter(x => x.type === 'out').reduce((s,x) => s + (+x.amount || 0), 0);
+    const inSum  = monthItems.filter(x => x.type === 'in').reduce((s,x) => s + (+x.amount || 0), 0);
+
+    document.getElementById('moneySummary').innerHTML =
+      `<div style="display:flex;justify-content:space-around;text-align:center">
+        <div><div style="font-size:28px;font-weight:600;color:#d9534f">¥${outSum.toFixed(0)}</div><div class="hint">本月支出</div></div>
+        <div><div style="font-size:28px;font-weight:600;color:#388e3c">¥${inSum.toFixed(0)}</div><div class="hint">本月收入</div></div>
+        <div><div style="font-size:28px;font-weight:600">¥${(inSum - outSum).toFixed(0)}</div><div class="hint">结余</div></div>
+      </div>`;
+
+    // 最近 20 条
+    const recent = list.slice(-20).reverse();
+    document.getElementById('moneyList').innerHTML = recent.length
+      ? recent.map(x => {
+          const cls = x.type === 'in' ? 'color:#388e3c' : '';
+          const sign = x.type === 'in' ? '+' : '-';
+          return `<div class="item">
+            <span style="font-weight:600;${cls};white-space:nowrap">${sign}¥${(+x.amount||0).toFixed(0)}</span>
+            <span class="grow"><span class="badge">${Util.esc(x.category||'')}</span> ${Util.esc(x.note||'')}</span>
+            <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">${(x.date||'').slice(5)}</span>
+            <button class="del" onclick="Money.del('${x.id}')">✕</button>
+          </div>`;
+        }).join('')
+      : '<div class="empty">还没有记录，记第一笔吧</div>';
+  },
+
+  pickCat(c){ this._cat = c; this.render(); },
+
+  add(){
+    const amt = document.getElementById('moneyAmount').value;
+    if (!amt || isNaN(amt)) { UI.toast('请输入金额'); return; }
+    const note = document.getElementById('moneyNote').value.trim();
+    const list = Store.get('money', []);
+    list.push({ id: Util.uid(), date: Util.today(), amount: +amt, type: this._type, category: this._cat, note });
+    Store.set('money', list);
+    document.getElementById('moneyAmount').value = '';
+    document.getElementById('moneyNote').value = '';
+    this.render();
+    UI.toast('记下了');
+  },
+
+  del(id){
+    let list = Store.get('money', []);
+    list = list.filter(x => x.id !== id);
+    Store.set('money', list);
+    this.render();
+  }
+};
+/* ==== 功能：记账 END ==== */
+
+
+/* ==== 功能：考试日历 START ==== */
+const Exam = {
+  _tab: 'ref',
+
+  switchTab(tab){
+    this._tab = tab;
+    document.getElementById('examTabRef').className = tab === 'ref' ? 'btn' : 'btn ghost';
+    document.getElementById('examTabNote').className = tab === 'note' ? 'btn' : 'btn ghost';
+    document.getElementById('examRef').style.display = tab === 'ref' ? '' : 'none';
+    document.getElementById('examNote').style.display = tab === 'note' ? '' : 'none';
+    if (tab === 'note') this.renderNotes();
+  },
+
+  render(){
+    this.switchTab(this._tab);
+    this.renderRef();
+    if (this._tab === 'note') this.renderNotes();
+  },
+
+  /* ======== 参考资料层（AI 定期更新，不会覆盖你的笔记） ======== */
+  renderRef(){
+    const el = document.getElementById('examRef');
+    el.innerHTML = `
+      <div class="card">
+        <h2>🎯 你的目标岗位画像</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">风景园林硕士 · 城建规划类 / 建筑工程类 / 不限专业</p>
+        <ul class="card-list">
+          <li>🏆 <b>对口系统</b>：自然资源和规划局（最强）→ 住建局/园林绿化中心 → 生态环境局/林业局 → 文旅局</li>
+          <li>📌 <b>优先策略</b>：筛选"限硕士+限专业+限2年基层经历"的岗位，每多一个限制条件竞争比约降1/3</li>
+          <li>💡 <b>你的独家优势</b>：浙江市级机关要求2年基层经历（应届生没有），龙湖仕官生经历刚好满足</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>📅 9场考试 · 时间线 · 5城</h2>
+        <div style="overflow-x:auto">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;line-height:1.8">
+          <tr style="border-bottom:1px solid rgba(0,0,0,.1)"><th style="text-align:left;padding:4px">考试</th><th style="text-align:left">城市</th><th>优先级</th><th style="text-align:right">预计笔试</th></tr>
+          <tr><td style="padding:4px">🇨🇳 国考</td><td>五城覆盖</td><td>⭐第一</td><td style="text-align:right">2026.11底</td></tr>
+          <tr><td>🏛️ 江苏省考</td><td>南京/苏州</td><td>⭐第一</td><td style="text-align:right">2026.12</td></tr>
+          <tr><td>🏛️ 浙江省考</td><td>杭州/宁波</td><td>第二</td><td style="text-align:right">2026.12</td></tr>
+          <tr><td>🏛️ 安徽省考</td><td>合肥</td><td>保底</td><td style="text-align:right">2027.3</td></tr>
+          <tr><td>📋 江苏事业统考</td><td>南京/苏州</td><td>⭐第一</td><td style="text-align:right">2027.4</td></tr>
+          <tr><td>📋 浙江事业统考</td><td>杭州</td><td>第二</td><td style="text-align:right">2027.4</td></tr>
+          <tr><td>📋 安徽事业统考</td><td>合肥</td><td>保底</td><td style="text-align:right">2027.3</td></tr>
+          <tr><td>📋 宁波事业</td><td>宁波</td><td>第二</td><td style="text-align:right">2027.4</td></tr>
+        </table>
+        </div>
+        <p class="hint">公告通常在笔试前约40天发布。国考公告预计10月中旬，苏考/浙考11月。国考报名第3-5天为最佳窗口。</p>
+      </div>
+
+      <div class="card">
+        <h2>📝 各城市考试差异速查</h2>
+        <ul class="card-list">
+          <li><b>国考</b>：135题/120min，副省/地市/行政执法三卷。🔗 <a href="http://www.scs.gov.cn" target="_blank">国家公务员局</a>（10月公告发布后专题页上线：bm.scs.gov.cn/kl2026）</li>
+          <li><b>江苏省考</b>：135题/120min，特色题含数字推理5题+字符排序+平面拼合。🔗 <a href="http://jshrss.jiangsu.gov.cn" target="_blank">报名入口</a></li>
+          <li><b>浙江省考</b>：130题/120min，数字推理5题。市级机关需2年经历（你有）。🔗 <a href="http://rlsbt.zj.gov.cn" target="_blank">报名入口</a></li>
+          <li><b>安徽省考/事业</b>：110题/120min，标准联考。🔗 <a href="http://www.apta.gov.cn" target="_blank">安徽人事考试网</a> · 🔗 <a href="http://rsj.hefei.gov.cn" target="_blank">合肥人社局</a></li>
+          <li>💡 研究生不限户籍（苏/浙/皖均可报），硕士年龄放宽至38-43岁</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>📚 科目 · 老师速查</h2>
+        <ul class="card-list">
+          <li><b>资料分析（性价比最高）</b>→ 花生十三（B站/四海）→ 目标正确率90%</li>
+          <li><b>判断推理</b>→ 聂佳（B站"聂佳杂谈"全免费）→ 图形用聂佳，逻辑用花生十三</li>
+          <li><b>言语理解</b>→ 顾斐入门 → 小宝/花生十三强化 → 目标75-80%</li>
+          <li><b>申论（你的优势科）</b>→ 李梦圆入门 → 站长拔高 → 目标65+</li>
+          <li><b>政治理论（新增模块）</b>→ 李梦娇时政口诀 + 学习强国APP每天15分钟</li>
+          <li><b>数量关系</b>→ 花生十三/齐麟 → 只做擅长的3-4类题型，其余全选C</li>
+          <li><b>常识判断</b>→ 李梦娇口诀歌（碎片时间听）→ 不强求</li>
+        </ul>
+        <p class="hint">📦 网盘资源链接（花生十三/聂佳/李梦圆完整系统课）已整理在复习计划文档中。B站关注四个官方号：花生十三-公考行测 / 聂佳杂谈 / 粉笔李梦圆 / 刘文超Vin</p>
+      </div>
+
+      <div class="card">
+        <h2>📖 资料采购清单</h2>
+        <ul class="card-list">
+          <li>✅ 必买：粉笔行测5000题（¥150-180）+ 粉笔申论100题（¥40-60）+ 花生十三1200题（¥36-45）+ 中公国考/苏考真题</li>
+          <li>📱 App：粉笔APP + 公考雷达 + 学习强国（三个都装手机）</li>
+          <li>💡 先走免费路线2周试水，能坚持再考虑粉笔980系统班（¥700-900）</li>
+        </ul>
+      </div>
+    `;
+  },
+
+  /* ======== 你的笔记层（只存在手机里，不会被 AI 更新覆盖） ======== */
+  renderNotes(){
+    const el = document.getElementById('examNote');
+    const progress = Store.get('exam_progress', {});
+    const notes = Store.get('exam_notes', '');
+
+    const modules = [
+      { key:'data', name:'资料分析', target:'90%' },
+      { key:'judge', name:'判断推理', target:'80%' },
+      { key:'verbal', name:'言语理解', target:'75-80%' },
+      { key:'essay', name:'申论', target:'65%+' },
+      { key:'politics', name:'政治理论', target:'70-75%' },
+      { key:'math', name:'数量关系', target:'50-60%' },
+      { key:'common', name:'常识判断', target:'50-60%' }
+    ];
+
+    el.innerHTML = `
+      <div class="card">
+        <h2>✅ 各模块进度</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">点一下切换状态：理论课 → 刷题中 → 已达标</p>
+        ${modules.map(m => {
+          const s = progress[m.key] || 0; // 0=未开始 1=理论课 2=刷题中 3=已达标
+          const labels = ['未开始','理论课','刷题中','已达标'];
+          const colors = ['','','rgba(45,38,32,.15)','rgba(76,175,80,.15)'];
+          return `<div class="item" style="cursor:pointer" onclick="Exam.toggleProgress('${m.key}')">
+            <span class="grow">${m.name} <span style="font-size:11px;color:var(--text-dim)">目标${m.target}</span></span>
+            <span style="font-size:12px;padding:3px 8px;border-radius:10px;background:${colors[s]}">${labels[s]}</span>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="card">
+        <h2>📝 复习笔记</h2>
+        <textarea id="examNotesInput" placeholder="记下重点、易错点、心得…" style="min-height:120px">${Util.esc(notes)}</textarea>
+        <p class="hint" id="examNotesHint">自动保存中</p>
+      </div>
+    `;
+
+    // 自动保存笔记
+    const ta = document.getElementById('examNotesInput');
+    let _timer;
+    ta.addEventListener('input', function(){
+      clearTimeout(_timer);
+      document.getElementById('examNotesHint').textContent = '输入中…';
+      _timer = setTimeout(() => {
+        Store.set('exam_notes', ta.value);
+        document.getElementById('examNotesHint').textContent = '已自动保存 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+      }, 1500);
+    });
+  },
+
+  toggleProgress(key){
+    const p = Store.get('exam_progress', {});
+    p[key] = ((p[key] || 0) + 1) % 4;
+    Store.set('exam_progress', p);
+    this.renderNotes();
+  }
+};
+/* ==== 功能：考试日历 END ==== */
+
+
+/* ==== 功能：投递追踪 START ==== */
+const Jobs = {
+  render(){
+    const key = Store.getSecret('deepseek');
+    const hint = document.getElementById('screenshotHint');
+    hint.textContent = key ? '已配置 DeepSeek key，可以上传截图识别' : '⚠️ 请先去「设置」填写 DeepSeek API key，才能使用截图识别';
+
+    const list = Store.get('applications', []);
+    document.getElementById('jobsList').innerHTML = list.length
+      ? list.slice().reverse().map(j => {
+          const badgeMap = { pending:'待投递', sent:'已投递', interview:'面试中', done:'已结束' };
+          const badge = badgeMap[j.status] || '待投递';
+          return `<div class="item">
+            <span class="grow">
+              <b>${Util.esc(j.company)}</b> · ${Util.esc(j.position)}<br>
+              <span style="font-size:12px;color:var(--text-dim)">
+                ${j.salary ? '💰 ' + Util.esc(j.salary) + ' · ' : ''}
+                ${j.deadline ? '📅 截止 ' + Util.esc(j.deadline) + ' · ' : ''}
+                <span class="badge ${j.status||'pending'}">${badge}</span>
+              </span>
+              ${j.note ? '<br><span style="font-size:12px;color:var(--text-dim)">📝 ' + Util.esc(j.note) + '</span>' : ''}
+            </span>
+            <button class="del" onclick="Jobs.del('${j.id}')">✕</button>
+          </div>`;
+        }).join('')
+      : '<div class="empty">还没有投递记录<br><span style="font-size:12px">上传招聘截图或手动添加</span></div>';
+  },
+
+  showAddForm(){
+    document.getElementById('jobFormOverlay').style.display = 'flex';
+    ['jobCompany','jobPosition','jobSalary','jobReq','jobDeadline','jobNote'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  },
+
+  closeAddForm(){
+    document.getElementById('jobFormOverlay').style.display = 'none';
+  },
+
+  addManual(){
+    const company  = document.getElementById('jobCompany').value.trim();
+    const position = document.getElementById('jobPosition').value.trim();
+    if (!company || !position) { UI.toast('公司名和岗位名必填'); return; }
+    const item = {
+      id: Util.uid(), date: Util.today(), company, position,
+      salary: document.getElementById('jobSalary').value.trim(),
+      requirements: document.getElementById('jobReq').value.trim(),
+      deadline: document.getElementById('jobDeadline').value.trim(),
+      note: document.getElementById('jobNote').value.trim(),
+      status: 'pending'
+    };
+    const list = Store.get('applications', []);
+    list.push(item);
+    Store.set('applications', list);
+    this.closeAddForm();
+    this.render();
+    UI.toast('已添加');
+  },
+
+  del(id){
+    let list = Store.get('applications', []);
+    list = list.filter(x => x.id !== id);
+    Store.set('applications', list);
+    this.render();
+  },
+
+  async uploadScreenshot(input){
+    const file = input.files[0];
+    if (!file) return;
+    const key = Store.getSecret('deepseek');
+    if (!key) { UI.toast('请先去设置页填写 DeepSeek API key'); input.value = ''; return; }
+
+    const hint = document.getElementById('screenshotHint');
+    const result = document.getElementById('ocrResult');
+    hint.innerHTML = '<span class="spin"></span> 正在识别截图…';
+    result.innerHTML = '';
+
+    try {
+      const dataUrl = await Util.compressImage(file, 1024, 0.8);
+      const base64 = dataUrl.split(',')[1];
+
+      const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: '这是一张招聘信息的截图。请提取以下信息，以 JSON 格式返回：{"company":"公司名称","position":"岗位名称","salary":"薪资范围","requirements":"核心要求摘要（50字以内）"}。如果有信息缺失，对应字段填空字符串。只返回 JSON，不要其他内容。' },
+              { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } }
+            ]
+          }],
+          max_tokens: 500
+        })
+      });
+
+      if (resp.status === 401) throw new Error('key 不对，去设置里检查一下');
+      if (!resp.ok) throw new Error('接口暂时用不了（' + resp.status + '）');
+
+      const data = await resp.json();
+      const raw = data.choices?.[0]?.message?.content || '';
+      // 提取 JSON（去掉可能的 markdown 代码块包裹）
+      const json = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(json);
+
+      hint.textContent = '✅ 识别完成，确认后保存';
+      result.innerHTML = `
+        <div class="card" style="margin-top:0">
+          <h3>识别结果</h3>
+          <div style="font-size:14px;line-height:2">
+            <b>公司：</b>${Util.esc(parsed.company || '未识别')}<br>
+            <b>岗位：</b>${Util.esc(parsed.position || '未识别')}<br>
+            <b>薪资：</b>${Util.esc(parsed.salary || '未提及')}<br>
+            <b>要求：</b>${Util.esc(parsed.requirements || '未提及')}
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn ghost" onclick="document.getElementById('ocrResult').innerHTML='';document.getElementById('screenshotHint').textContent=''">取消</button>
+            <button class="btn" onclick="Jobs.saveOCR('${Util.esc(parsed.company||'').replace(/'/g,"\\'")}','${Util.esc(parsed.position||'').replace(/'/g,"\\'")}','${Util.esc(parsed.salary||'').replace(/'/g,"\\'")}','${Util.esc(parsed.requirements||'').replace(/'/g,"\\'")}')">确认保存</button>
+          </div>
+        </div>`;
+    } catch(e){
+      hint.textContent = '❌ ' + e.message;
+      console.error(e);
+    }
+    input.value = '';
+  },
+
+  saveOCR(company, position, salary, requirements){
+    const list = Store.get('applications', []);
+    list.push({
+      id: Util.uid(), date: Util.today(), company, position, salary, requirements,
+      deadline: '', note: '', status: 'pending'
+    });
+    Store.set('applications', list);
+    document.getElementById('ocrResult').innerHTML = '';
+    document.getElementById('screenshotHint').textContent = '';
+    this.render();
+    UI.toast('已保存');
+  }
+};
+/* ==== 功能：投递追踪 END ==== */
+
+
+/* ==== 功能：选题灵感 START ==== */
+const Ideas = {
+  render(){
+    const el = document.getElementById('ideasContent');
+    const TODAY = Util.today();
+    el.innerHTML = `
+      <div class="card">
+        <h2>🔥 近期小红书热点话题</h2>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">生成于 2026-08-03 · 约够用 2 周 · 用完跟我说我重新生成</div>
+        <ul class="card-list">
+          <li><b>#gap期日常</b> — 越来越多人在分享辞职/被裁后的真实生活，共鸣感极强。你可以用「离职第 N 天」系列切入</li>
+          <li><b>#大厂离职后</b> — 龙湖仕官生这个标签本身就有认知度，写写"为什么离开"和"离开后才知道的事"</li>
+          <li><b>#跨行转行</b> — 风景园林转产品/AI，这个路线很少见，差异化叙事本身就吸引眼球</li>
+          <li><b>#28岁重新开始</b> — 年龄+重启的双重话题，"硕士毕业两年后主动离职"这类标题容易引发讨论</li>
+          <li><b>#失业日记</b> — 持续记录型内容，适合你的动态定位，每一天都有新素材</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>💡 选题方向建议</h2>
+        <ul class="card-list">
+          <li>📝 <b>「从龙湖仕官生到离职，我经历了什么」</b> — 坦诚复盘型，容易引发同行和大厂人共鸣</li>
+          <li>📝 <b>「风景园林硕士，为什么想去搞AI」</b> — 反差感标题，跨行故事天然有好奇心点击</li>
+          <li>📝 <b>「gap 第 X 天：今天做了这 3 件事」</b> — 轻量日更，配合工作台的每日三件事，有内容来源</li>
+          <li>📝 <b>「离职后的第一个月，我花了多少钱」</b> — 结合记账数据出内容，真实数据比编的更打动人</li>
+          <li>📝 <b>「投了 30 家公司后的真实反馈」</b> — 产品/咨询转行求职记录，有信息增量和情绪共振</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>🎯 平台扶持与技巧</h2>
+        <ul class="card-list">
+          <li>🔹 小红书对「成长记录」「职业转型」「真实生活」类内容有流量倾斜</li>
+          <li>🔹 封面建议用你自己的照片或工作台截图，人脸+文字卡片点击率最高</li>
+          <li>🔹 发布时间：工作日 12:00-13:00 或 19:00-21:00，周末上午</li>
+          <li>🔹 标签组合：2-3 个大标签（#gap #跨行 #失业日记）+ 2-3 个小标签（#龙湖 #风景园林 #28岁）</li>
+          <li>🔹 保持更新频率比单篇质量重要，建议每周至少 3 篇</li>
+        </ul>
+      </div>
+    `;
+  }
+};
+/* ==== 功能：选题灵感 END ==== */
+
+
+/* ==== 功能：转行分析 START ==== */
+const Career = {
+  render(){
+    const el = document.getElementById('careerContent');
+    el.innerHTML = `
+      <div class="card">
+        <h2>📋 你的背景画像</h2>
+        <ul class="card-list">
+          <li>🎓 <b>学历</b>：硕士，风景园林设计专业（本硕七年）</li>
+          <li>💼 <b>经历</b>：龙湖集团仕官生，2年</li>
+          <li>🏷️ <b>优势</b>：大厂综合经验（项目管理、跨部门协作、甲方视角）、设计思维与空间规划能力、名校光环</li>
+          <li>⚠️ <b>短板</b>：无产品/AI 领域的垂直经验</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>🎯 方向一：产品设计（推荐度 ⭐⭐⭐⭐）</h2>
+        <ul class="card-list">
+          <li><b>适配理由</b>：风景园林本身就是"空间产品设计"，设计方法论是通的——用户研究、方案迭代、落地管控。龙湖的甲方经验让你天然具备"从需求到交付"的全流程视角，这是很多纯产品经理没有的</li>
+          <li><b>推荐岗位</b>：产品助理 / 初级产品经理 / 产品运营</li>
+          <li><b>行业选择</b>：智慧城市、空间科技、地产科技（你的专业背景在这些领域反而是加分项）；或通用互联网产品（门槛低，竞争大）</li>
+          <li><b>切入路径</b>：① 自学 Figma + Axure，补作品集 ② 做一个小产品项目（哪怕是概念稿） ③ 从产品助理投起，利用大厂背景争取面试</li>
+          <li><b>预计难度</b>：中等。需要补技能和作品集，但转行路径清晰</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>🤖 方向二：AI 咨询 / AI 应用（推荐度 ⭐⭐⭐）</h2>
+        <ul class="card-list">
+          <li><b>适配理由</b>：AI 咨询看重"理解业务+沟通表达+结构化思维"，你的硕士背景和龙湖经历能证明这三点。目前 AI 赛道缺"懂业务又愿意学技术"的人，跨行窗口还在</li>
+          <li><b>推荐岗位</b>：AI 产品助理 / AI 解决方案助理 / AI 应用顾问</li>
+          <li><b>切入路径</b>：① 系统学习 AI 基础概念（免费课够用，不用报班）② 用 AI 工具做一两个实际案例（哪怕是帮朋友的小项目）③ 找 AI 创业公司或大厂的 AI 业务线，入门比纯技术岗友好</li>
+          <li><b>预计难度</b>：较高。需要补 AI 知识体系，且目前市场对 AI 咨询的认知还在形成中</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>🔍 方向三：值得关注的其他方向</h2>
+        <ul class="card-list">
+          <li>🏗️ <b>智慧城市/空间科技</b>：你的景观+龙湖背景是优势而非劣势，这个细分赛道竞争者少，且切合你的专业积累</li>
+          <li>📐 <b>UX/交互设计</b>：空间设计转交互设计是成熟路径，作品集的转化比产品容易</li>
+          <li>💬 <b>售前/解决方案</b>：龙湖的甲方沟通经验可以迁移，门槛比纯产品低，后续再转产品也顺</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>📌 行动建议</h2>
+        <ul class="card-list">
+          <li>1. <b>先投产品方向</b>，AI 咨询作为 B 方案。产品岗位多、反馈快，先拿到面试感受市场反馈</li>
+          <li>2. <b>一周内</b>：整理龙湖的项目经验，翻译成产品语言（不要说"做了景观方案"，说"从用户需求出发完成了从概念到落地的产品设计"）</li>
+          <li>3. <b>两周内</b>：学完 Figma 基础 + 画一个产品原型，放到作品集里</li>
+          <li>4. <b>同时进行</b>：考公备考不要完全放弃，产品和考公两条线不冲突，三个月后哪边先出结果就往哪边靠</li>
+        </ul>
+      </div>
+    `;
+  }
+};
+/* ==== 功能：转行分析 END ==== */
+
+
+/* ==== 功能：复盘 START ==== */
+const Review = {
+  render(){
+    const today = Util.today();
+    // 计算本周一
+    const d = new Date();
+    const day = d.getDay() || 7; // 周日=7
+    d.setDate(d.getDate() - day + 1); // 本周一
+    const mon = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    document.getElementById('reviewDate').textContent = '本周：' + mon + ' ~ ' + today;
+
+    // 汇总本周三件事
+    let totalTasks = 0, doneTasks = 0, journalDays = 0;
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(d);
+      dt.setDate(dt.getDate() + i);
+      const ds = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+      const tasks = Store.get('things:' + ds);
+      if (tasks) { totalTasks += tasks.length; doneTasks += tasks.filter(t => t.done).length; }
+      if (Store.get('journal:' + ds)) journalDays++;
+    }
+
+    // 汇总本周记账
+    const moneyList = Store.get('money', []);
+    const weekMoney = moneyList.filter(x => x.date >= mon && x.date <= today);
+    const weekOut = weekMoney.filter(x => x.type === 'out').reduce((s,x) => s + (+x.amount||0), 0);
+    const weekIn  = weekMoney.filter(x => x.type === 'in').reduce((s,x) => s + (+x.amount||0), 0);
+
+    // 汇总本周投递
+    const apps = Store.get('applications', []);
+    const weekApps = apps.filter(x => x.date >= mon && x.date <= today);
+
+    const el = document.getElementById('reviewContent');
+    el.innerHTML = `
+      <div class="card">
+        <h2>📋 三件事完成情况</h2>
+        <div style="display:flex;justify-content:space-around;text-align:center">
+          <div><div style="font-size:28px;font-weight:600">${totalTasks}</div><div class="hint">本周任务</div></div>
+          <div><div style="font-size:28px;font-weight:600;color:#388e3c">${doneTasks}</div><div class="hint">已完成</div></div>
+          <div><div style="font-size:28px;font-weight:600">${journalDays}</div><div class="hint">写了日记</div></div>
+        </div>
+        ${totalTasks ? '<div class="bar" style="margin-top:10px"><i style="width:' + (totalTasks ? doneTasks/totalTasks*100 : 0) + '%"></i></div>' : ''}
+        <p class="hint">${doneTasks >= totalTasks && totalTasks > 0 ? '🎉 这周全部完成了！' : totalTasks === 0 ? '这周还没开始记录，明天开始写三件事吧' : '继续加油，你是最棒的 🍊'}</p>
+      </div>
+
+      <div class="card">
+        <h2>💰 本周花销</h2>
+        <div style="display:flex;justify-content:space-around;text-align:center">
+          <div><div style="font-size:28px;font-weight:600;color:#d9534f">¥${weekOut.toFixed(0)}</div><div class="hint">支出</div></div>
+          <div><div style="font-size:28px;font-weight:600;color:#388e3c">¥${weekIn.toFixed(0)}</div><div class="hint">收入</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📸 本周投递</h2>
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:600">${weekApps.length}</div>
+          <div class="hint">本周新增投递</div>
+        </div>
+        ${weekApps.length ? '<div style="margin-top:8px">' + weekApps.map(j =>
+          '<div style="font-size:13px;padding:4px 0">📌 ' + Util.esc(j.company) + ' · ' + Util.esc(j.position) + '</div>'
+        ).join('') + '</div>' : '<p class="hint">这周还没有新增，刷到合适的记得收藏进来</p>'}
+      </div>
+
+      <div class="card">
+        <p class="hint" style="text-align:center;margin:0">
+          📊 每周日更新 · 数据来自你的记录<br>
+          坚持记录，复盘才有意义 🍊
+        </p>
+      </div>
+    `;
+  }
+};
+/* ==== 功能：复盘 END ==== */
+
+
+App.init();
+</script>
+</body>
+</html>
