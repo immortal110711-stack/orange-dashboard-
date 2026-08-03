@@ -982,6 +982,7 @@ const Jobs = {
     hint.innerHTML = '<span class="spin"></span> 正在识别截图…';
     result.innerHTML = '';
 
+    let raw = '';
     try {
       const dataUrl = await Util.compressImage(file, 1024, 0.8);
       const base64 = dataUrl.split(',')[1];
@@ -1006,18 +1007,22 @@ const Jobs = {
       if (!resp.ok) throw new Error('接口暂时用不了（' + resp.status + '）');
 
       const data = await resp.json();
-      const raw = data.choices?.[0]?.message?.content || '';
-      // 提取 JSON（去掉可能的 markdown 代码块包裹）
-      const json = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(json);
+      raw = data.choices?.[0]?.message?.content || '';
+      // 提取 JSON：先去掉 markdown 代码块，再从花括号里取
+      let cleaned = raw.replace(/```[\s\S]*?```/g, m => m.replace(/```\w*\n?|```/g, '')).trim();
+      // 找第一个 { 到最后一个 }
+      const start = cleaned.indexOf('{'), end = cleaned.lastIndexOf('}');
+      if (start === -1 || end <= start) throw new Error('AI 没返回有效信息，换个截图试试');
+      const parsed = JSON.parse(cleaned.slice(start, end + 1));
 
       // Store result for confirmation
       this._ocrResult = parsed;
       this.render();
     } catch(e){
-      const hint = document.getElementById('screenshotHint');
-      if (hint) hint.textContent = '❌ ' + e.message;
-      console.error(e);
+      // render() 会重建 DOM，所以通过重新 render 来显示错误
+      this._lastError = e.message;
+      this.render();
+      console.error('OCR error:', e, 'raw:', raw);
     }
     input.value = '';
   },
