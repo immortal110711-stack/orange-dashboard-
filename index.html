@@ -19,8 +19,8 @@
 <title>橙子的工作台</title>
 
 <!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json?v=2">
+<link rel="apple-touch-icon" href="icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="橙子">
@@ -70,6 +70,7 @@ body{
 }
 .nav button .ico{display:block;font-size:21px;margin-bottom:3px}
 .nav button.on{background:var(--sidebar-active);color:#fff}
+.nav-sep{height:1px;background:var(--sidebar-text);opacity:.2;margin:6px 8px}
 
 /* ==== 内容区 ==== */
 .main{
@@ -96,7 +97,7 @@ input,textarea,select{
 textarea{min-height:88px;resize:vertical;line-height:1.6}
 input::placeholder,textarea::placeholder{color:var(--text-dim)}
 .btn{
-  padding:11px 18px;font-size:15px;font-family:inherit;white-space:nowrap;
+  padding:11px 18px;font-size:16px;font-family:inherit;white-space:nowrap;
   border:none;border-radius:calc(var(--radius) - 6px);
   background:var(--accent);color:#fff;cursor:pointer;
 }
@@ -253,32 +254,17 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
     </section>
     <!-- ==== 功能：考试日历 END ==== -->
 
-    <!-- ==== 功能：投递追踪 START ==== -->
+    <!-- ==== 功能：求职 START ==== -->
     <section class="page" id="page-jobs">
-      <div class="page-title">投递追踪</div>
-
-      <div class="card">
-        <h2>📸 截图识别岗位</h2>
-        <p class="hint" style="margin-top:0;margin-bottom:10px">
-          上传招聘截图，AI 自动提取岗位信息
-        </p>
-        <div class="row">
-          <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="Jobs.uploadScreenshot(this)">
-          <button class="btn" onclick="document.getElementById('screenshotInput').click()">📎 上传截图识别</button>
-        </div>
-        <p class="hint" id="screenshotHint"></p>
-        <div id="ocrResult" style="margin-top:10px"></div>
+      <div class="page-title">求职</div>
+      <div class="row" style="margin-bottom:4px">
+        <button class="btn" id="ctabJobs" onclick="CareerPage.switchTab('jobs')">📸 投递追踪</button>
+        <button class="btn ghost" id="ctabGuide" onclick="CareerPage.switchTab('guide')">🧭 转行分析</button>
       </div>
-
-      <div class="card">
-        <h2>📋 投递记录</h2>
-        <div class="row" style="margin-bottom:10px">
-          <button class="btn ghost" onclick="Jobs.showAddForm()" style="width:100%">+ 手动添加</button>
-        </div>
-        <div id="jobsList"></div>
-      </div>
+      <div id="careerJobsTab"></div>
+      <div id="careerGuideTab" style="display:none"></div>
     </section>
-    <!-- ==== 功能：投递追踪 END ==== -->
+    <!-- ==== 功能：求职 END ==== -->
 
     <!-- ==== 功能：选题灵感 START ==== -->
     <section class="page" id="page-ideas">
@@ -287,14 +273,6 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
       <div id="ideasContent"></div>
     </section>
     <!-- ==== 功能：选题灵感 END ==== -->
-
-    <!-- ==== 功能：转行分析 START ==== -->
-    <section class="page" id="page-career">
-      <div class="page-title">转行方向分析</div>
-      <div class="page-sub">基于你的背景 · 适配方向与切入路径</div>
-      <div id="careerContent"></div>
-    </section>
-    <!-- ==== 功能：转行分析 END ==== -->
 
     <!-- ==== 功能：复盘 START ==== -->
     <section class="page" id="page-review">
@@ -328,9 +306,14 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
           填在这里的 key 只保存在你自己的手机上，不会上传，也<b>不会被导出到备份文件里</b>。
         </p>
         <div style="margin-bottom:12px">
-          <label style="font-size:14px;display:block;margin-bottom:6px">DeepSeek API Key</label>
+          <label style="font-size:16px;display:block;margin-bottom:6px">小米 MiMo API Key（截图识别用）</label>
+          <input type="password" id="key_mimo" placeholder="粘贴你的 key">
+          <p class="hint">在 platform.xiaomimimo.com 注册后获取。MiMo-V2.5 支持图片识别，用于上传截图提取岗位信息。</p>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:16px;display:block;margin-bottom:6px">DeepSeek API Key（备用）</label>
           <input type="password" id="key_deepseek" placeholder="粘贴你的 key">
-          <p class="hint">在 platform.deepseek.com 注册后，「API Keys」里创建一个。用于截图识别岗位信息。</p>
+          <p class="hint">在 platform.deepseek.com 注册。暂时未用到，后续联网功能可能用它。</p>
         </div>
         <button class="btn" onclick="Settings.saveKeys()">保存</button>
       </div>
@@ -524,15 +507,15 @@ const App = {
   routes: [
     { id:'things',   icon:'📋', name:'三件事', onShow: () => Things.render() },
     { id:'money',    icon:'💰', name:'记账',   onShow: () => Money.render() },
-    { id:'jobs',     icon:'📸', name:'投递',   onShow: () => Jobs.render() },
-    { id:'ideas',    icon:'💡', name:'选题',   onShow: () => Ideas.render() },
-    { id:'exam',     icon:'🎯', name:'考试',   onShow: () => Exam.render() },
-    { id:'career',   icon:'🧭', name:'转行',   onShow: () => Career.render() },
     { id:'review',   icon:'📊', name:'复盘',   onShow: () => Review.render() },
+    { id:'jobs',     icon:'🚀', name:'求职',   onShow: () => CareerPage.render() },
+    { id:'exam',     icon:'🎯', name:'考试',   onShow: () => Exam.render() },
+    { id:'ideas',    icon:'💡', name:'选题',   onShow: () => Ideas.render() },
     { id:'settings', icon:'⚙️', name:'设置',   onShow: () => Settings.render() }
   ],
 
   go(id){
+    if (!id) return;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
     document.getElementById('page-' + id)?.classList.add('on');
     document.querySelectorAll('#nav button').forEach(b =>
@@ -543,10 +526,14 @@ const App = {
   },
 
   init(){
-    document.getElementById('nav').innerHTML = this.routes.map(r =>
-      `<button data-id="${r.id}" onclick="App.go('${r.id}')">
-         <span class="ico">${r.icon}</span>${r.name}
-       </button>`).join('');
+    const sepAfter = new Set(['review','jobs']); // 在这里加分隔线
+    document.getElementById('nav').innerHTML = this.routes.map(r => {
+      let html = `<button data-id="${r.id}" onclick="App.go('${r.id}')">
+        <span class="ico">${r.icon}</span>${r.name}
+      </button>`;
+      if (sepAfter.has(r.id)) html += '<div class="nav-sep"></div>';
+      return html;
+    }).join('');
 
     const last = Store.get('_lastPage');
     this.go(this.routes.some(r => r.id === last) ? last : this.routes[0].id);
@@ -570,7 +557,7 @@ const App = {
    Settings · 设置页
    ═══════════════════════════════════════════════════════════ */
 const Settings = {
-  keys: ['deepseek'],
+  keys: ['mimo', 'deepseek'],
 
   render(){
     this.refreshBackupInfo();
@@ -884,32 +871,66 @@ const Exam = {
 /* ==== 功能：考试日历 END ==== */
 
 
-/* ==== 功能：投递追踪 START ==== */
-const Jobs = {
+/* ==== 功能：求职 START ==== */
+const CareerPage = {
+  _tab: 'jobs',
+  switchTab(tab){
+    this._tab = tab;
+    document.getElementById('ctabJobs').className = tab === 'jobs' ? 'btn' : 'btn ghost';
+    document.getElementById('ctabGuide').className = tab === 'guide' ? 'btn' : 'btn ghost';
+    document.getElementById('careerJobsTab').style.display = tab === 'jobs' ? '' : 'none';
+    document.getElementById('careerGuideTab').style.display = tab === 'guide' ? '' : 'none';
+    if (tab === 'jobs') Jobs.render();
+    if (tab === 'guide') Career.render();
+  },
   render(){
-    const key = Store.getSecret('deepseek');
-    const hint = document.getElementById('screenshotHint');
-    hint.textContent = key ? '已配置 DeepSeek key，可以上传截图识别' : '⚠️ 请先去「设置」填写 DeepSeek API key，才能使用截图识别';
+    this.switchTab(this._tab || 'jobs');
+  }
+};
 
+const Jobs = {
+  _ocrResult: null, // parsed OCR result pending confirmation
+
+  render(){
+    const key = Store.getSecret('mimo');
     const list = Store.get('applications', []);
-    document.getElementById('jobsList').innerHTML = list.length
-      ? list.slice().reverse().map(j => {
-          const badgeMap = { pending:'待投递', sent:'已投递', interview:'面试中', done:'已结束' };
-          const badge = badgeMap[j.status] || '待投递';
-          return `<div class="item">
-            <span class="grow">
-              <b>${Util.esc(j.company)}</b> · ${Util.esc(j.position)}<br>
-              <span style="font-size:12px;color:var(--text-dim)">
-                ${j.salary ? '💰 ' + Util.esc(j.salary) + ' · ' : ''}
-                ${j.deadline ? '📅 截止 ' + Util.esc(j.deadline) + ' · ' : ''}
-                <span class="badge ${j.status||'pending'}">${badge}</span>
-              </span>
-              ${j.note ? '<br><span style="font-size:12px;color:var(--text-dim)">📝 ' + Util.esc(j.note) + '</span>' : ''}
-            </span>
-            <button class="del" onclick="Jobs.del('${j.id}')">✕</button>
-          </div>`;
-        }).join('')
-      : '<div class="empty">还没有投递记录<br><span style="font-size:12px">上传招聘截图或手动添加</span></div>';
+    const el = document.getElementById('careerJobsTab');
+
+    el.innerHTML = `
+      <div class="card">
+        <h2>📸 截图识别岗位</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">
+          上传招聘截图，MiMo AI 自动提取岗位信息
+        </p>
+        <div class="row">
+          <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="Jobs.uploadScreenshot(this)">
+          <button class="btn" onclick="document.getElementById('screenshotInput').click()">📎 上传截图识别</button>
+        </div>
+        <p class="hint" id="screenshotHint">${key ? '已配置 MiMo key，可以上传截图识别' : '⚠️ 请先去「设置」填写小米 MiMo API key，才能使用截图识别'}</p>
+        <div id="ocrResult" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <h2>📋 投递记录</h2>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn ghost" onclick="Jobs.showAddForm()" style="width:100%">+ 手动添加</button>
+        </div>
+        <div id="jobsList">${list.length
+          ? list.slice().reverse().map(j => {
+              const badgeMap = { pending:'待投递', sent:'已投递', interview:'面试中', done:'已结束' };
+              const badge = badgeMap[j.status] || '待投递';
+              return '<div class="item"><span class="grow"><b>' + Util.esc(j.company) + '</b> · ' + Util.esc(j.position) + '<br><span style="font-size:12px;color:var(--text-dim)">' + (j.salary ? '💰 ' + Util.esc(j.salary) + ' · ' : '') + (j.deadline ? '📅 截止 ' + Util.esc(j.deadline) + ' · ' : '') + '<span class="badge ' + (j.status||'pending') + '">' + badge + '</span></span>' + (j.note ? '<br><span style="font-size:12px;color:var(--text-dim)">📝 ' + Util.esc(j.note) + '</span>' : '') + '</span><button class="del" onclick="Jobs.del(\'' + j.id + '\')">✕</button></div>';
+            }).join('')
+          : '<div class="empty">还没有投递记录<br><span style="font-size:12px">上传招聘截图或手动添加</span></div>'
+        }</div>
+      </div>
+    `;
+
+    // Restore pending OCR result if any
+    if (this._ocrResult) {
+      const r = this._ocrResult;
+      document.getElementById('ocrResult').innerHTML = '<div class="card" style="margin-top:0"><h3>识别结果</h3><div style="font-size:14px;line-height:2"><b>公司：</b>' + Util.esc(r.company||'未识别') + '<br><b>岗位：</b>' + Util.esc(r.position||'未识别') + '<br><b>薪资：</b>' + Util.esc(r.salary||'未提及') + '<br><b>要求：</b>' + Util.esc(r.requirements||'未提及') + '</div><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="Jobs._ocrResult=null;Jobs.render()">取消</button><button class="btn" onclick="Jobs.saveOCR()">确认保存</button></div></div>';
+    }
   },
 
   showAddForm(){
@@ -953,8 +974,8 @@ const Jobs = {
   async uploadScreenshot(input){
     const file = input.files[0];
     if (!file) return;
-    const key = Store.getSecret('deepseek');
-    if (!key) { UI.toast('请先去设置页填写 DeepSeek API key'); input.value = ''; return; }
+    const key = Store.getSecret('mimo');
+    if (!key) { UI.toast('请先去设置页填写小米 MiMo API key'); input.value = ''; return; }
 
     const hint = document.getElementById('screenshotHint');
     const result = document.getElementById('ocrResult');
@@ -965,11 +986,11 @@ const Jobs = {
       const dataUrl = await Util.compressImage(file, 1024, 0.8);
       const base64 = dataUrl.split(',')[1];
 
-      const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const resp = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        headers: { 'Content-Type': 'application/json', 'api-key': key },
         body: JSON.stringify({
-          model: 'deepseek-chat',
+          model: 'mimo-v2.5',
           messages: [{
             role: 'user',
             content: [
@@ -990,42 +1011,34 @@ const Jobs = {
       const json = raw.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(json);
 
-      hint.textContent = '✅ 识别完成，确认后保存';
-      result.innerHTML = `
-        <div class="card" style="margin-top:0">
-          <h3>识别结果</h3>
-          <div style="font-size:14px;line-height:2">
-            <b>公司：</b>${Util.esc(parsed.company || '未识别')}<br>
-            <b>岗位：</b>${Util.esc(parsed.position || '未识别')}<br>
-            <b>薪资：</b>${Util.esc(parsed.salary || '未提及')}<br>
-            <b>要求：</b>${Util.esc(parsed.requirements || '未提及')}
-          </div>
-          <div class="row" style="margin-top:10px">
-            <button class="btn ghost" onclick="document.getElementById('ocrResult').innerHTML='';document.getElementById('screenshotHint').textContent=''">取消</button>
-            <button class="btn" onclick="Jobs.saveOCR('${Util.esc(parsed.company||'').replace(/'/g,"\\'")}','${Util.esc(parsed.position||'').replace(/'/g,"\\'")}','${Util.esc(parsed.salary||'').replace(/'/g,"\\'")}','${Util.esc(parsed.requirements||'').replace(/'/g,"\\'")}')">确认保存</button>
-          </div>
-        </div>`;
+      // Store result for confirmation
+      this._ocrResult = parsed;
+      this.render();
     } catch(e){
-      hint.textContent = '❌ ' + e.message;
+      const hint = document.getElementById('screenshotHint');
+      if (hint) hint.textContent = '❌ ' + e.message;
       console.error(e);
     }
     input.value = '';
   },
 
-  saveOCR(company, position, salary, requirements){
+  saveOCR(){
+    if (!this._ocrResult) return;
     const list = Store.get('applications', []);
     list.push({
-      id: Util.uid(), date: Util.today(), company, position, salary, requirements,
+      id: Util.uid(), date: Util.today(),
+      company: this._ocrResult.company || '',
+      position: this._ocrResult.position || '',
+      salary: this._ocrResult.salary || '',
+      requirements: this._ocrResult.requirements || '',
       deadline: '', note: '', status: 'pending'
     });
     Store.set('applications', list);
-    document.getElementById('ocrResult').innerHTML = '';
-    document.getElementById('screenshotHint').textContent = '';
+    this._ocrResult = null;
     this.render();
     UI.toast('已保存');
   }
 };
-/* ==== 功能：投递追踪 END ==== */
 
 
 /* ==== 功能：选题灵感 START ==== */
@@ -1073,10 +1086,9 @@ const Ideas = {
 /* ==== 功能：选题灵感 END ==== */
 
 
-/* ==== 功能：转行分析 START ==== */
 const Career = {
   render(){
-    const el = document.getElementById('careerContent');
+    const el = document.getElementById('careerGuideTab');
     el.innerHTML = `
       <div class="card">
         <h2>📋 你的背景画像</h2>
@@ -1130,7 +1142,7 @@ const Career = {
     `;
   }
 };
-/* ==== 功能：转行分析 END ==== */
+/* ==== 功能：求职 END ==== */
 
 
 /* ==== 功能：复盘 START ==== */
