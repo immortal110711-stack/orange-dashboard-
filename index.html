@@ -258,10 +258,12 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
     <section class="page" id="page-jobs">
       <div class="page-title">求职</div>
       <div class="row" style="margin-bottom:4px">
-        <button class="btn" id="ctabJobs" onclick="CareerPage.switchTab('jobs')">📸 投递追踪</button>
+        <button class="btn" id="ctabOcr" onclick="CareerPage.switchTab('ocr')">📸 截图识别</button>
+        <button class="btn ghost" id="ctabApps" onclick="CareerPage.switchTab('apps')">📋 投递记录</button>
         <button class="btn ghost" id="ctabGuide" onclick="CareerPage.switchTab('guide')">🧭 转行分析</button>
       </div>
-      <div id="careerJobsTab"></div>
+      <div id="careerOcrTab"></div>
+      <div id="careerAppsTab" style="display:none"></div>
       <div id="careerGuideTab" style="display:none"></div>
     </section>
     <!-- ==== 功能：求职 END ==== -->
@@ -340,7 +342,7 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
 
 <!-- 手动添加岗位的弹层 -->
 <div id="jobFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;align-items:flex-end;justify-content:center"
-     onclick="if(event.target===this) Jobs.closeAddForm()">
+     onclick="if(event.target===this) Apps.closeForm()">
   <div style="background:var(--card);width:100%;max-width:500px;border-radius:var(--radius) var(--radius) 0 0;padding:20px;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
     <h3 style="margin-bottom:14px">添加岗位</h3>
     <input type="text" id="jobCompany" placeholder="公司名称" style="margin-bottom:8px">
@@ -350,8 +352,8 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
     <input type="text" id="jobDeadline" placeholder="截止日期（选填）" style="margin-bottom:8px">
     <textarea id="jobNote" placeholder="备注（选填）" style="min-height:60px;margin-bottom:12px"></textarea>
     <div class="row">
-      <button class="btn ghost" onclick="Jobs.closeAddForm()" style="flex:1">取消</button>
-      <button class="btn" onclick="Jobs.addManual()" style="flex:1">添加</button>
+      <button class="btn ghost" onclick="Apps.closeForm()" style="flex:1">取消</button>
+      <button class="btn" onclick="Apps.add()" style="flex:1">添加</button>
     </div>
   </div>
 </div>
@@ -873,235 +875,348 @@ const Exam = {
 
 /* ==== 功能：求职 START ==== */
 const CareerPage = {
-  _tab: 'jobs',
+  _tab: 'ocr',
   switchTab(tab){
     this._tab = tab;
-    document.getElementById('ctabJobs').className = tab === 'jobs' ? 'btn' : 'btn ghost';
+    document.getElementById('ctabOcr').className = tab === 'ocr' ? 'btn' : 'btn ghost';
+    document.getElementById('ctabApps').className = tab === 'apps' ? 'btn' : 'btn ghost';
     document.getElementById('ctabGuide').className = tab === 'guide' ? 'btn' : 'btn ghost';
-    document.getElementById('careerJobsTab').style.display = tab === 'jobs' ? '' : 'none';
+    document.getElementById('careerOcrTab').style.display = tab === 'ocr' ? '' : 'none';
+    document.getElementById('careerAppsTab').style.display = tab === 'apps' ? '' : 'none';
     document.getElementById('careerGuideTab').style.display = tab === 'guide' ? '' : 'none';
-    if (tab === 'jobs') Jobs.render();
-    if (tab === 'guide') Career.render();
+    if (tab === 'ocr') OcrJobs.render();
+    else if (tab === 'apps') Apps.render();
+    else if (tab === 'guide') Career.render();
   },
-  render(){
-    this.switchTab(this._tab || 'jobs');
-  }
+  render(){ this.switchTab(this._tab); }
 };
 
-const Jobs = {
-  _ocrResult: null, // parsed OCR result pending confirmation
+/* ======== 📸 截图识别 ======== */
+const OcrJobs = {
+  _result: null, _error: null, _expanded: {},
 
   render(){
     const key = Store.getSecret('mimo');
-    const list = Store.get('applications', []);
-    const el = document.getElementById('careerJobsTab');
+    const list = Store.get('ocr_jobs', []);
+    const el = document.getElementById('careerOcrTab');
 
-    el.innerHTML = `
-      <div class="card">
-        <h2>📸 截图识别岗位</h2>
-        <p class="hint" style="margin-top:0;margin-bottom:10px">
-          上传招聘截图，MiMo AI 自动提取岗位信息
-        </p>
-        <div class="row">
-          <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="Jobs.uploadScreenshot(this)">
-          <button class="btn" onclick="document.getElementById('screenshotInput').click()">📎 上传截图识别</button>
-        </div>
-        <p class="hint" id="screenshotHint">${key ? '已配置 MiMo key，可以上传截图识别' : '⚠️ 请先去「设置」填写小米 MiMo API key，才能使用截图识别'}</p>
-        <div id="ocrResult" style="margin-top:10px"></div>
+    let h = '';
+    if (this._error) {
+      h += `<div class="card" style="border:1px solid rgba(217,83,79,.3);background:rgba(217,83,79,.06)"><h2>❌ 识别失败</h2><p style="font-size:14px">${Util.esc(this._error)}</p><button class="btn ghost" style="margin-top:8px" onclick="OcrJobs._error=null;OcrJobs.render()">关闭</button></div>`;
+    }
+
+    h += `<div class="card">
+      <h2>📸 截图识别岗位</h2>
+      <p class="hint" style="margin-top:0;margin-bottom:10px">上传招聘截图，AI 自动提取岗位信息</p>
+      <div class="row">
+        <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="OcrJobs.upload(this)">
+        <button class="btn" onclick="document.getElementById('screenshotInput').click()">📎 上传截图识别</button>
       </div>
+      <p class="hint" id="screenshotHint">${key ? '已配置 MiMo key，可以上传截图识别' : '⚠️ 请先去「设置」填写小米 MiMo API key'}</p>
+      <div id="ocrResult" style="margin-top:10px"></div>
+    </div>`;
 
-      <div class="card">
-        <h2>📋 投递记录</h2>
-        <div class="row" style="margin-bottom:10px">
-          <button class="btn ghost" onclick="Jobs.showAddForm()" style="width:100%">+ 手动添加</button>
-        </div>
-        <div id="jobsList">${list.length
-          ? list.slice().reverse().map(j => {
-              const badgeMap = { pending:'待投递', sent:'已投递', interview:'面试中', done:'已结束' };
-              const badge = badgeMap[j.status] || '待投递';
-              return '<div class="item"><span class="grow"><b>' + Util.esc(j.company) + '</b> · ' + Util.esc(j.position) + '<br><span style="font-size:12px;color:var(--text-dim)">' + (j.salary ? '💰 ' + Util.esc(j.salary) + ' · ' : '') + (j.deadline ? '📅 截止 ' + Util.esc(j.deadline) + ' · ' : '') + '<span class="badge ' + (j.status||'pending') + '">' + badge + '</span></span>' + (j.note ? '<br><span style="font-size:12px;color:var(--text-dim)">📝 ' + Util.esc(j.note) + '</span>' : '') + '</span><button class="del" onclick="Jobs.del(\'' + j.id + '\')">✕</button></div>';
-            }).join('')
-          : '<div class="empty">还没有投递记录<br><span style="font-size:12px">上传招聘截图或手动添加</span></div>'
-        }</div>
-      </div>
-    `;
+    h += `<div class="card"><h2>📦 已识别的岗位（${list.length}）</h2>`;
+    if (!list.length) {
+      h += '<div class="empty">还没有保存的岗位<br><span style="font-size:12px">上传招聘截图识别后保存到这里</span></div>';
+    } else {
+      list.slice().reverse().forEach(j => {
+        const open = this._expanded[j.id];
+        h += `<div class="item" style="cursor:pointer;flex-wrap:wrap" onclick="OcrJobs.toggle('${j.id}')">
+          <span class="grow"><b>${Util.esc(j.company)}</b> · ${Util.esc(j.position)}</span>
+          <span style="font-size:12px;color:var(--text-dim)">${j.salary ? '💰'+Util.esc(j.salary)+' · ' : ''}${(j.date||'').slice(5)}</span>
+          ${open ? `<div style="width:100%;margin-top:8px;padding:10px;background:rgba(0,0,0,.03);border-radius:8px;font-size:13px;line-height:1.7">${j.requirements ? '<b>核心要求：</b>'+Util.esc(j.requirements)+'<br>' : ''}${j.note ? '<b>备注：</b>'+Util.esc(j.note) : ''}</div>` : ''}
+          <button class="del" onclick="event.stopPropagation();OcrJobs.del('${j.id}')">✕</button>
+        </div>`;
+      });
+    }
+    h += '</div>';
+    el.innerHTML = h;
 
-    // Restore pending OCR result if any
-    if (this._ocrResult) {
-      const r = this._ocrResult;
-      document.getElementById('ocrResult').innerHTML = '<div class="card" style="margin-top:0"><h3>识别结果</h3><div style="font-size:14px;line-height:2"><b>公司：</b>' + Util.esc(r.company||'未识别') + '<br><b>岗位：</b>' + Util.esc(r.position||'未识别') + '<br><b>薪资：</b>' + Util.esc(r.salary||'未提及') + '<br><b>要求：</b>' + Util.esc(r.requirements||'未提及') + '</div><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="Jobs._ocrResult=null;Jobs.render()">取消</button><button class="btn" onclick="Jobs.saveOCR()">确认保存</button></div></div>';
+    if (this._result) {
+      const r = this._result;
+      document.getElementById('ocrResult').innerHTML = `<div class="card" style="margin-top:0"><h3>识别结果</h3><div style="font-size:14px;line-height:2"><b>公司：</b>${Util.esc(r.company||'未识别')}<br><b>岗位：</b>${Util.esc(r.position||'未识别')}<br><b>薪资：</b>${Util.esc(r.salary||'未提及')}<br><b>要求：</b>${Util.esc(r.requirements||'未提及')}</div><div class="row" style="margin-top:10px"><button class="btn ghost" onclick="OcrJobs._result=null;OcrJobs.render()">取消</button><button class="btn" onclick="OcrJobs.save()">确认保存</button></div></div>`;
     }
   },
 
-  showAddForm(){
+  toggle(id){ this._expanded[id] = !this._expanded[id]; this.render(); },
+
+  save(){
+    if (!this._result) return;
+    Store.set('ocr_jobs', [].concat(Store.get('ocr_jobs', []), [{ id: Util.uid(), date: Util.today(), ...this._result, note: '' }]));
+    this._result = null; this.render(); UI.toast('已保存');
+  },
+
+  del(id){
+    Store.set('ocr_jobs', Store.get('ocr_jobs', []).filter(x => x.id !== id));
+    this.render();
+  },
+
+  async upload(input){
+    const file = input.files[0];
+    if (!file) return;
+    const key = Store.getSecret('mimo');
+    if (!key) { UI.toast('请先去设置页填写 MiMo API key'); input.value = ''; return; }
+    const hint = document.getElementById('screenshotHint');
+    hint.innerHTML = '<span class="spin"></span> 正在识别截图…';
+    document.getElementById('ocrResult').innerHTML = '';
+    this._error = null; let raw = '';
+    try {
+      let isTall = false;
+      try {
+        const tmp = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(); i.src = URL.createObjectURL(file); });
+        isTall = tmp.height / tmp.width > 3; URL.revokeObjectURL(tmp.src);
+      } catch {}
+      const dUrl = await Util.compressImage(file, isTall ? 1600 : 1024, isTall ? 0.92 : 0.8);
+      const b64 = dUrl.split(',')[1];
+      const resp = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'api-key': key },
+        body: JSON.stringify({ model: 'mimo-v2.5', messages: [{ role: 'user', content: [
+          { type: 'text', text: '提取招聘截图中的岗位信息，只返回JSON：{"company":"公司名","position":"岗位名","salary":"薪资","requirements":"核心要求（50-80字）"}。缺失字段填空字符串。' },
+          { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } }
+        ]}], max_tokens: 500 })
+      });
+      if (resp.status === 401) throw new Error('key 不对');
+      if (!resp.ok) throw new Error('接口暂时不可用（' + resp.status + '）');
+      const data = await resp.json();
+      raw = data.choices?.[0]?.message?.content || '';
+      let s = raw.replace(/```[\s\S]*?```/g, m => m.replace(/```\w*\n?|```/g, '')).trim();
+      const a = s.indexOf('{'), b = s.lastIndexOf('}');
+      if (a === -1 || b <= a) throw new Error('AI 没返回JSON，换个截图试试');
+      this._result = JSON.parse(s.slice(a, b + 1));
+      hint.textContent = '✅ 识别完成，确认后保存';
+    } catch(e){
+      hint.textContent = '❌ ' + e.message;
+      this._error = e.message + (raw ? '（返回：' + raw.slice(0,80) + '）' : '');
+    }
+    input.value = '';
+    this.render();
+  }
+};
+
+
+/* ======== 📋 投递记录 ======== */
+const Apps = {
+  _expanded: {},
+
+  render(){
+    const list = Store.get('applications', []);
+    const el = document.getElementById('careerAppsTab');
+    const counts = { pending:0, sent:0, interview:0, done:0 };
+    list.forEach(j => { if (counts[j.status] !== undefined) counts[j.status]++; });
+
+    let h = '';
+    if (list.length) {
+      h += `<div class="card"><div style="display:flex;justify-content:space-around;text-align:center;font-size:14px">
+        <div><div style="font-size:22px;font-weight:600">${counts.pending}</div><div class="hint">待投递</div></div>
+        <div><div style="font-size:22px;font-weight:600">${counts.sent}</div><div class="hint">已投递</div></div>
+        <div><div style="font-size:22px;font-weight:600;color:#d4a373">${counts.interview}</div><div class="hint">面试中</div></div>
+        <div><div style="font-size:22px;font-weight:600;color:#388e3c">${counts.done}</div><div class="hint">已结束</div></div>
+      </div></div>`;
+    }
+
+    h += `<div class="card"><button class="btn ghost" onclick="Apps.showForm()" style="width:100%">+ 添加新投递</button></div>`;
+
+    h += `<div class="card"><h2>📬 投递列表（${list.length}）</h2>`;
+    if (!list.length) {
+      h += '<div class="empty">还没有投递记录<br><span style="font-size:12px">手动添加你投了简历的岗位</span></div>';
+    } else {
+      const labels = { pending:'📌 待投递', sent:'📤 已投递', interview:'💬 面试中', done:'✅ 已结束' };
+      list.slice().reverse().forEach(j => {
+        const open = this._expanded[j.id];
+        h += `<div class="item" style="cursor:pointer;flex-wrap:wrap" onclick="Apps.toggle('${j.id}')">
+          <span class="grow"><b>${Util.esc(j.company)}</b> · ${Util.esc(j.position)}</span>
+          <span style="font-size:12px">${labels[j.status]||'📌 待投递'}</span>
+          ${open ? `<div style="width:100%;margin-top:8px;padding:10px;background:rgba(0,0,0,.03);border-radius:8px;font-size:13px;line-height:1.7">
+            ${j.salary?'<b>薪资：</b>'+Util.esc(j.salary)+'<br>':''}${j.requirements?'<b>要求：</b>'+Util.esc(j.requirements)+'<br>':''}${j.deadline?'<b>截止日：</b>'+Util.esc(j.deadline)+'<br>':''}${j.note?'<b>备注：</b>'+Util.esc(j.note)+'<br>':''}
+            <div style="margin-top:6px"><b>状态：</b>
+              <button class="tag${j.status==='pending'?' on':''}" onclick="event.stopPropagation();Apps.setStatus('${j.id}','pending')" style="font-size:11px;padding:4px 8px">待投递</button>
+              <button class="tag${j.status==='sent'?' on':''}" onclick="event.stopPropagation();Apps.setStatus('${j.id}','sent')" style="font-size:11px;padding:4px 8px">已投递</button>
+              <button class="tag${j.status==='interview'?' on':''}" onclick="event.stopPropagation();Apps.setStatus('${j.id}','interview')" style="font-size:11px;padding:4px 8px">面试中</button>
+              <button class="tag${j.status==='done'?' on':''}" onclick="event.stopPropagation();Apps.setStatus('${j.id}','done')" style="font-size:11px;padding:4px 8px">已结束</button>
+            </div>
+          </div>` : ''}
+          <button class="del" onclick="event.stopPropagation();Apps.del('${j.id}')">✕</button>
+        </div>`;
+      });
+    }
+    h += '</div>';
+    el.innerHTML = h;
+  },
+
+  toggle(id){ this._expanded[id] = !this._expanded[id]; this.render(); },
+
+  showForm(){
     document.getElementById('jobFormOverlay').style.display = 'flex';
-    ['jobCompany','jobPosition','jobSalary','jobReq','jobDeadline','jobNote'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    ['jobCompany','jobPosition','jobSalary','jobReq','jobDeadline','jobNote'].forEach(id => { document.getElementById(id).value = ''; });
   },
+  closeForm(){ document.getElementById('jobFormOverlay').style.display = 'none'; },
 
-  closeAddForm(){
-    document.getElementById('jobFormOverlay').style.display = 'none';
-  },
-
-  addManual(){
-    const company  = document.getElementById('jobCompany').value.trim();
+  add(){
+    const company = document.getElementById('jobCompany').value.trim();
     const position = document.getElementById('jobPosition').value.trim();
     if (!company || !position) { UI.toast('公司名和岗位名必填'); return; }
-    const item = {
+    Store.set('applications', [].concat(Store.get('applications', []), [{
       id: Util.uid(), date: Util.today(), company, position,
       salary: document.getElementById('jobSalary').value.trim(),
       requirements: document.getElementById('jobReq').value.trim(),
       deadline: document.getElementById('jobDeadline').value.trim(),
       note: document.getElementById('jobNote').value.trim(),
       status: 'pending'
-    };
-    const list = Store.get('applications', []);
-    list.push(item);
-    Store.set('applications', list);
-    this.closeAddForm();
-    this.render();
-    UI.toast('已添加');
+    }]));
+    this.closeForm(); this.render(); UI.toast('已添加');
   },
 
-  del(id){
-    let list = Store.get('applications', []);
-    list = list.filter(x => x.id !== id);
-    Store.set('applications', list);
-    this.render();
-  },
+  setStatus(id, s){ const list = Store.get('applications', []); const item = list.find(x => x.id === id); if (item) item.status = s; Store.set('applications', list); this.render(); },
 
-  async uploadScreenshot(input){
-    const file = input.files[0];
-    if (!file) return;
-    const key = Store.getSecret('mimo');
-    if (!key) { UI.toast('请先去设置页填写小米 MiMo API key'); input.value = ''; return; }
-
-    const hint = document.getElementById('screenshotHint');
-    const result = document.getElementById('ocrResult');
-    hint.innerHTML = '<span class="spin"></span> 正在识别截图…';
-    result.innerHTML = '';
-
-    let raw = '';
-    try {
-      // 长图检测：宽高比超过 3:1 的图减少压缩，保留更多细节
-      let isTall = false;
-      try {
-        const tmpImg = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error('load failed'));
-          img.src = URL.createObjectURL(file);
-        });
-        isTall = tmpImg.height / tmpImg.width > 3;
-        URL.revokeObjectURL(tmpImg.src);
-      } catch {}
-      const maxW = isTall ? 1600 : 1024;
-      const quality = isTall ? 0.92 : 0.8;
-      const dataUrl = await Util.compressImage(file, maxW, quality);
-      const base64 = dataUrl.split(',')[1];
-
-      const resp = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-key': key },
-        body: JSON.stringify({
-          model: 'mimo-v2.5',
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: isTall
-                ? '这是一张较长的招聘信息截图，可能包含多个岗位或详细职位描述。请仔细阅读所有文字，提取第一个/主要的岗位信息，以 JSON 格式返回：{"company":"公司名称","position":"岗位名称","salary":"薪资范围","requirements":"核心要求摘要（80字以内）"}。如果有信息缺失，对应字段填空字符串。只返回 JSON，不要其他内容。'
-                : '这是一张招聘信息的截图。请提取以下信息，以 JSON 格式返回：{"company":"公司名称","position":"岗位名称","salary":"薪资范围","requirements":"核心要求摘要（50字以内）"}。如果有信息缺失，对应字段填空字符串。只返回 JSON，不要其他内容。' },
-              { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } }
-            ]
-          }],
-          max_tokens: 500
-        })
-      });
-
-      if (resp.status === 401) throw new Error('key 不对，去设置里检查一下');
-      if (!resp.ok) throw new Error('接口暂时用不了（' + resp.status + '）');
-
-      const data = await resp.json();
-      raw = data.choices?.[0]?.message?.content || '';
-      // 提取 JSON：先去掉 markdown 代码块，再从花括号里取
-      let cleaned = raw.replace(/```[\s\S]*?```/g, m => m.replace(/```\w*\n?|```/g, '')).trim();
-      // 找第一个 { 到最后一个 }
-      const start = cleaned.indexOf('{'), end = cleaned.lastIndexOf('}');
-      if (start === -1 || end <= start) throw new Error('AI 没返回有效信息，换个截图试试');
-      const parsed = JSON.parse(cleaned.slice(start, end + 1));
-
-      // Store result for confirmation
-      this._ocrResult = parsed;
-      this.render();
-    } catch(e){
-      // render() 会重建 DOM，所以通过重新 render 来显示错误
-      this._lastError = e.message;
-      this.render();
-      console.error('OCR error:', e, 'raw:', raw);
-    }
-    input.value = '';
-  },
-
-  saveOCR(){
-    if (!this._ocrResult) return;
-    const list = Store.get('applications', []);
-    list.push({
-      id: Util.uid(), date: Util.today(),
-      company: this._ocrResult.company || '',
-      position: this._ocrResult.position || '',
-      salary: this._ocrResult.salary || '',
-      requirements: this._ocrResult.requirements || '',
-      deadline: '', note: '', status: 'pending'
-    });
-    Store.set('applications', list);
-    this._ocrResult = null;
-    this.render();
-    UI.toast('已保存');
-  }
+  del(id){ Store.set('applications', Store.get('applications', []).filter(x => x.id !== id)); this.render(); }
 };
 
 
 /* ==== 功能：选题灵感 START ==== */
 const Ideas = {
-  render(){
-    const el = document.getElementById('ideasContent');
-    const TODAY = Util.today();
-    el.innerHTML = `
+  _loading: false,
+
+  // 默认兜底内容（无网络或没配 key 时显示）
+  _fallback(){
+    return `
       <div class="card">
         <h2>🔥 近期小红书热点话题</h2>
-        <div class="hint" style="margin-top:0;margin-bottom:10px">生成于 2026-08-03 · 约够用 2 周 · 用完跟我说我重新生成</div>
         <ul class="card-list">
-          <li><b>#gap期日常</b> — 越来越多人在分享辞职/被裁后的真实生活，共鸣感极强。你可以用「离职第 N 天」系列切入</li>
-          <li><b>#大厂离职后</b> — 龙湖仕官生这个标签本身就有认知度，写写"为什么离开"和"离开后才知道的事"</li>
-          <li><b>#跨行转行</b> — 风景园林转产品/AI，这个路线很少见，差异化叙事本身就吸引眼球</li>
-          <li><b>#28岁重新开始</b> — 年龄+重启的双重话题，"硕士毕业两年后主动离职"这类标题容易引发讨论</li>
-          <li><b>#失业日记</b> — 持续记录型内容，适合你的动态定位，每一天都有新素材</li>
+          <li><b>#gap期日常</b> — 辞职/被裁后的真实生活，共鸣感极强</li>
+          <li><b>#大厂离职后</b> — 用「龙湖仕官生」标签写离开后的变化</li>
+          <li><b>#跨行转行</b> — 风景园林转产品/AI，差异化叙事吸引眼球</li>
+          <li><b>#28岁重新开始</b> — 年龄+重启话题，容易引发讨论</li>
+          <li><b>#失业日记</b> — 持续记录型内容，每天都有新素材</li>
         </ul>
       </div>
-
       <div class="card">
         <h2>💡 选题方向建议</h2>
         <ul class="card-list">
-          <li>📝 <b>「从龙湖仕官生到离职，我经历了什么」</b> — 坦诚复盘型，容易引发同行和大厂人共鸣</li>
-          <li>📝 <b>「风景园林硕士，为什么想去搞AI」</b> — 反差感标题，跨行故事天然有好奇心点击</li>
-          <li>📝 <b>「gap 第 X 天：今天做了这 3 件事」</b> — 轻量日更，配合工作台的每日三件事，有内容来源</li>
-          <li>📝 <b>「离职后的第一个月，我花了多少钱」</b> — 结合记账数据出内容，真实数据比编的更打动人</li>
-          <li>📝 <b>「投了 30 家公司后的真实反馈」</b> — 产品/咨询转行求职记录，有信息增量和情绪共振</li>
+          <li>📝 <b>「从龙湖仕官生到离职，我经历了什么」</b></li>
+          <li>📝 <b>「风景园林硕士，为什么想去搞AI」</b></li>
+          <li>📝 <b>「gap 第 X 天：今天做了这 3 件事」</b></li>
+          <li>📝 <b>「离职后的第一个月，我花了多少钱」</b></li>
+          <li>📝 <b>「投了 30 家公司后的真实反馈」</b></li>
         </ul>
       </div>
-
       <div class="card">
         <h2>🎯 平台扶持与技巧</h2>
         <ul class="card-list">
-          <li>🔹 小红书对「成长记录」「职业转型」「真实生活」类内容有流量倾斜</li>
-          <li>🔹 封面建议用你自己的照片或工作台截图，人脸+文字卡片点击率最高</li>
-          <li>🔹 发布时间：工作日 12:00-13:00 或 19:00-21:00，周末上午</li>
-          <li>🔹 标签组合：2-3 个大标签（#gap #跨行 #失业日记）+ 2-3 个小标签（#龙湖 #风景园林 #28岁）</li>
-          <li>🔹 保持更新频率比单篇质量重要，建议每周至少 3 篇</li>
+          <li>🔹 小红书对「成长记录」「职业转型」「真实生活」类有流量倾斜</li>
+          <li>🔹 封面用照片或工作台截图，人脸+文字卡片点击率最高</li>
+          <li>🔹 发布时间：工作日 12:00-13:00 或 19:00-21:00</li>
+          <li>🔹 标签：2-3大标签 + 2-3小标签，每周至少 3 篇</li>
         </ul>
-      </div>
-    `;
+      </div>`;
+  },
+
+  render(){
+    const el = document.getElementById('ideasContent');
+    const cached = Store.get('ideas_cache');
+    const lastRefresh = Store.get('ideas_lastRefresh');
+
+    // 头部：刷新按钮 + 时间
+    let header = `<div class="row" style="margin-bottom:4px">
+      <span style="flex:1"><span class="hint" id="ideasTime">${lastRefresh ? '上次刷新：' + new Date(lastRefresh).toLocaleString('zh-CN') : '默认内容 · 点击刷新获取最新'}</span></span>
+      <button class="btn" id="ideasRefreshBtn" onclick="Ideas.refresh()" style="flex-shrink:0">🔄 刷新选题</button>
+    </div>`;
+
+    // 内容：优先缓存，否则兜底
+    let body;
+    if (cached) {
+      body = cached;
+    } else {
+      body = this._fallback();
+    }
+
+    // 加载中
+    if (this._loading) {
+      body = `<div class="loading"><span class="spin"></span>正在搜索最新热点和选题…</div>`;
+    }
+
+    el.innerHTML = header + body;
+  },
+
+  async refresh(){
+    const key = Store.getSecret('mimo');
+    if (!key) {
+      UI.toast('请先去设置页填写 MiMo API key');
+      return;
+    }
+
+    this._loading = true;
+    this.render();
+    const btn = document.getElementById('ideasRefreshBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 搜索中…'; }
+
+    const prompt = `你是一个小红书内容运营专家。请帮我为「失业后重拾人生」主题的自媒体账号分析当前（2026年8月）小红书热点，并以JSON格式返回：
+{
+  "hot_topics": [
+    {"tag": "话题标签", "desc": "为什么火、账号怎么切入（30字以内）"}
+  ],
+  "content_ideas": [
+    {"title": "选题标题建议", "why": "为什么推荐这个选题（30字以内）"}
+  ],
+  "tips": "一条最新的小红书运营技巧或平台动向（50字以内）"
+}
+账号背景：28岁硕士，本硕风景园林，龙湖仕官生2年后主动离职，gap期跨行求职+考公+做自媒体。内容方向是gap期成长记录、跨行求职真实经历、离职后的人生思考。只返回JSON，不要markdown。`;
+
+    try {
+      const resp = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': key },
+        body: JSON.stringify({
+          model: 'mimo-v2.5',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1500
+        })
+      });
+
+      if (resp.status === 401) throw new Error('key 不对');
+      if (!resp.ok) throw new Error('接口暂时不可用（' + resp.status + '）');
+
+      const data = await resp.json();
+      const raw = data.choices?.[0]?.message?.content || '';
+      let s = raw.replace(/```[\s\S]*?```/g, m => m.replace(/```\w*\n?|```/g, '')).trim();
+      const a = s.indexOf('{'), b = s.lastIndexOf('}');
+      if (a === -1 || b <= a) throw new Error('AI 返回格式异常，再试一次');
+
+      const result = JSON.parse(s.slice(a, b + 1));
+
+      // 转成 HTML 卡片
+      const topicsHtml = (result.hot_topics || []).map(t =>
+        `<li><b>${Util.esc(t.tag)}</b> — ${Util.esc(t.desc)}</li>`
+      ).join('');
+
+      const ideasHtml = (result.content_ideas || []).map(c =>
+        `<li>📝 <b>${Util.esc(c.title)}</b> — ${Util.esc(c.why)}</li>`
+      ).join('');
+
+      const html = `
+        <div class="card">
+          <h2>🔥 最新热点话题</h2>
+          <ul class="card-list">${topicsHtml || '<li>暂无热点数据</li>'}</ul>
+        </div>
+        <div class="card">
+          <h2>💡 选题方向建议</h2>
+          <ul class="card-list">${ideasHtml || '<li>暂无选题建议</li>'}</ul>
+        </div>
+        <div class="card">
+          <h2>🎯 运营技巧</h2>
+          <p style="font-size:14px;line-height:1.7">${result.tips ? Util.esc(result.tips) : '保持更新频率比单篇质量重要，每周至少 3 篇。'}</p>
+        </div>`;
+
+      Store.set('ideas_cache', html);
+      Store.set('ideas_lastRefresh', Date.now());
+      this._loading = false;
+      this.render();
+      UI.toast('选题已更新 ✅');
+    } catch(e){
+      this._loading = false;
+      this.render();
+      UI.toast('❌ ' + e.message);
+    }
   }
 };
 /* ==== 功能：选题灵感 END ==== */
