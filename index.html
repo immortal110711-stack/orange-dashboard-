@@ -19,7 +19,7 @@
 <title>橙子的工作台</title>
 
 <!-- PWA -->
-<link rel="manifest" href="manifest.json?v=2">
+<link rel="manifest" href="manifest.json?v=3">
 <link rel="apple-touch-icon" href="icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -168,6 +168,43 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
 @keyframes sp{to{transform:rotate(360deg)}}
 .loading{text-align:center;padding:24px;color:var(--text-dim);font-size:14px}
 .loading .spin{margin-right:8px;vertical-align:middle}
+
+/* ==== 日期滑动条 ==== */
+.date-strip{
+  display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding:2px 0;scrollbar-width:none;
+}
+.date-strip::-webkit-scrollbar{display:none}
+.date-chip{
+  flex-shrink:0;padding:7px 12px;border-radius:20px;
+  font-size:13px;background:transparent;border:1px solid rgba(128,128,128,.2);
+  color:var(--text-dim);cursor:pointer;position:relative;
+}
+.date-chip.on{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+.date-chip .dot{
+  display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:var(--accent);margin-left:3px;vertical-align:middle;
+}
+.date-chip.on .dot{background:#fff}
+
+/* ==== 随笔时间线 ==== */
+.timeline-group{margin-bottom:12px}
+.timeline-date{
+  font-size:13px;color:var(--text-dim);margin-bottom:6px;
+  padding-left:4px;font-weight:500;
+}
+.journal-card{
+  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:14px;margin-bottom:8px;
+}
+.journal-card .j-time{
+  font-size:12px;color:var(--text-dim);margin-bottom:6px;
+}
+.journal-card .j-text{
+  font-size:15px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+}
 </style>
 </head>
 <body>
@@ -193,23 +230,36 @@ input::placeholder,textarea::placeholder{color:var(--text-dim)}
       <div class="page-title">每日三件事</div>
       <div class="page-sub" id="thingsDate"></div>
 
+      <!-- 日期滑动条 -->
+      <div class="date-strip" id="thingsDateStrip"></div>
+
       <div class="card">
-        <h2>📋 今天要做的三件事</h2>
+        <h2>📋 <span id="thingsCardTitle">今天要做的三件事</span></h2>
         <div id="tasksList"></div>
-        <div class="row" style="margin-top:10px">
+        <div class="row" style="margin-top:10px" id="thingsInputRow">
           <input type="text" id="taskInput" placeholder="加一件事…">
           <button class="btn" onclick="Things.addTask()">添加</button>
         </div>
         <p class="hint" id="taskHint"></p>
       </div>
-
-      <div class="card">
-        <h2>📝 随笔 · 心情感悟</h2>
-        <textarea id="journalInput" placeholder="今天想写点什么……"></textarea>
-        <p class="hint" id="journalHint">自动保存中，放心写</p>
-      </div>
     </section>
     <!-- ==== 功能：三件事 END ==== -->
+
+    <!-- ==== 功能：随笔 START ==== -->
+    <section class="page" id="page-journal">
+      <div class="page-title">随笔 · 心情感悟</div>
+      <div class="page-sub" id="journalDate"></div>
+
+      <div class="card">
+        <h2>📝 写随笔</h2>
+        <textarea id="journalInput" placeholder="今天想写点什么……"></textarea>
+        <button class="btn" onclick="Journal.save()" style="margin-top:10px;width:100%">保存随笔</button>
+        <p class="hint" id="journalHint"></p>
+      </div>
+
+      <div id="journalTimeline"></div>
+    </section>
+    <!-- ==== 功能：随笔 END ==== -->
 
     <!-- ==== 功能：记账 START ==== -->
     <section class="page" id="page-money">
@@ -458,6 +508,7 @@ const Util = {
            String(d.getMonth()+1).padStart(2,'0') + '-' +
            String(d.getDate()).padStart(2,'0');
   },
+  fmtDate(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); },
   uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); },
   esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
 
@@ -508,6 +559,7 @@ const UI = {
 const App = {
   routes: [
     { id:'things',   icon:'📋', name:'三件事', onShow: () => Things.render() },
+    { id:'journal',  icon:'📝', name:'随笔',   onShow: () => Journal.render() },
     { id:'money',    icon:'💰', name:'记账',   onShow: () => Money.render() },
     { id:'review',   icon:'📊', name:'复盘',   onShow: () => Review.render() },
     { id:'jobs',     icon:'🚀', name:'求职',   onShow: () => CareerPage.render() },
@@ -528,7 +580,7 @@ const App = {
   },
 
   init(){
-    const sepAfter = new Set(['review','jobs']); // 在这里加分隔线
+    const sepAfter = new Set(['journal','review','jobs']); // 在这里加分隔线
     document.getElementById('nav').innerHTML = this.routes.map(r => {
       let html = `<button data-id="${r.id}" onclick="App.go('${r.id}')">
         <span class="ico">${r.icon}</span>${r.name}
@@ -589,67 +641,179 @@ const Settings = {
 
 /* ==== 功能：三件事 START ==== */
 const Things = {
+  _date: Util.today(), // 当前查看的日期
+
   render(){
     const today = Util.today();
-    document.getElementById('thingsDate').textContent = today;
-    const tasks = Store.getDaily('things', []);
-    const journal = Store.getDaily('journal', '');
-    document.getElementById('journalInput').value = journal;
+    const cur = this._date;
+    document.getElementById('thingsDate').textContent = cur;
+    document.getElementById('thingsCardTitle').textContent =
+      cur === today ? '今天要做的三件事' : '要做的事';
+    const tasks = Store.get('things:' + cur, []);
 
     const done = tasks.filter(t => t.done).length;
     const total = tasks.length;
+    const isToday = cur === today;
     document.getElementById('taskHint').textContent = total
       ? `已完成 ${done}/${total}` + (done === total ? ' 🎉' : '')
-      : '写下今天最重要的三件事';
+      : (isToday ? '写下今天最重要的三件事' : '这一天还没有记录');
 
     document.getElementById('tasksList').innerHTML = tasks.length
       ? tasks.map((t, i) => `<div class="item${t.done ? ' done' : ''}">
-           <div class="box" onclick="Things.toggle('${t.id}')">${t.done ? '✓' : ''}</div>
+           <div class="box" onclick="Things.toggle('${t.id}')"${isToday ? '' : ' style="pointer-events:none"'}>${t.done ? '✓' : ''}</div>
            <span class="grow">${Util.esc(t.text)}</span>
-           <button class="del" onclick="Things.del('${t.id}')">✕</button>
+           ${isToday ? `<button class="del" onclick="Things.del('${t.id}')">✕</button>` : ''}
          </div>`).join('')
       : '<div class="empty">还没有内容</div>';
+
+    // 输入行：只有今天显示
+    document.getElementById('thingsInputRow').style.display = isToday ? '' : 'none';
+
+    // 日期滑动条
+    this.renderStrip();
+  },
+
+  // 日期滑动条：最近 14 天
+  renderStrip(){
+    const today = Util.today();
+    const cur = this._date;
+    // 收集有数据的日期
+    const hasData = new Set();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = Util.fmtDate(d);
+      const tasks = Store.get('things:' + ds, []);
+      if (tasks.length > 0) hasData.add(ds);
+    }
+    // 生成 14 个日期片
+    const chips = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = Util.fmtDate(d);
+      const label = i === 0 ? '今天' : (d.getMonth()+1) + '/' + d.getDate();
+      const dot = hasData.has(ds) ? '<span class="dot"></span>' : '';
+      chips.push(`<div class="date-chip${ds === cur ? ' on' : ''}" onclick="Things.goDate('${ds}')">${label}${dot}</div>`);
+    }
+    document.getElementById('thingsDateStrip').innerHTML = chips.join('');
+
+    // 自动滚动到今天
+    const todayChip = document.querySelector('#thingsDateStrip .date-chip.on');
+    if (todayChip) todayChip.scrollIntoView({ inline: 'center', behavior: 'smooth' });
+  },
+
+  goDate(ds){
+    this._date = ds;
+    this.render();
   },
 
   addTask(){
     const el = document.getElementById('taskInput');
     const text = el.value.trim();
     if (!text) return;
-    const tasks = Store.getDaily('things', []);
+    const tasks = Store.get('things:' + Util.today(), []);
     tasks.push({ id: Util.uid(), text, done: false });
-    Store.setDaily('things', tasks);
+    Store.set('things:' + Util.today(), tasks);
     el.value = '';
+    this._date = Util.today();
     this.render();
   },
 
   toggle(id){
-    const tasks = Store.getDaily('things', []);
+    const cur = this._date;
+    if (cur !== Util.today()) return;
+    const tasks = Store.get('things:' + cur, []);
     const t = tasks.find(x => x.id === id);
     if (t) t.done = !t.done;
-    Store.setDaily('things', tasks);
+    Store.set('things:' + cur, tasks);
     this.render();
   },
 
   del(id){
-    let tasks = Store.getDaily('things', []);
+    const cur = this._date;
+    if (cur !== Util.today()) return;
+    let tasks = Store.get('things:' + cur, []);
     tasks = tasks.filter(x => x.id !== id);
-    Store.setDaily('things', tasks);
+    Store.set('things:' + cur, tasks);
     this.render();
   }
 };
-
-// 随笔自动保存（3 秒无输入后保存）
-let _journalTimer;
-document.getElementById('journalInput').addEventListener('input', function(){
-  clearTimeout(_journalTimer);
-  const hint = document.getElementById('journalHint');
-  hint.textContent = '输入中…';
-  _journalTimer = setTimeout(() => {
-    Store.setDaily('journal', this.value);
-    hint.textContent = '已自动保存 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
-  }, 1500);
-});
 /* ==== 功能：三件事 END ==== */
+
+
+/* ==== 功能：随笔 START ==== */
+const Journal = {
+  render(){
+    const today = Util.today();
+    document.getElementById('journalDate').textContent = today;
+    document.getElementById('journalInput').value = '';
+    document.getElementById('journalHint').textContent = '';
+    this.renderTimeline();
+  },
+
+  save(){
+    const el = document.getElementById('journalInput');
+    const text = el.value.trim();
+    if (!text) { UI.toast('写点什么再保存吧'); return; }
+    const today = Util.today();
+    let entries = Store.get('journal:' + today, null);
+
+    // 迁移旧格式：字符串 → 数组
+    if (typeof entries === 'string') {
+      entries = [{ id: Util.uid(), text: entries, time: '--:--' }];
+    }
+    if (!Array.isArray(entries)) entries = [];
+
+    const now = new Date();
+    entries.push({
+      id: Util.uid(),
+      text: text,
+      time: now.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'})
+    });
+    Store.set('journal:' + today, entries);
+    el.value = '';
+    document.getElementById('journalHint').textContent =
+      '已保存 ' + now.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+    this.renderTimeline();
+    UI.toast('随笔已保存 ✨');
+  },
+
+  renderTimeline(){
+    const today = Util.today();
+    // 收集所有 journal:* 日期，倒序排列
+    const days = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('bysdash:journal:')) continue;
+      const ds = k.slice('bysdash:journal:'.length);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) days.push(ds);
+    }
+    days.sort().reverse();
+
+    if (!days.length) {
+      document.getElementById('journalTimeline').innerHTML =
+        '<div class="empty">还没有随笔，写下一篇吧</div>';
+      return;
+    }
+
+    document.getElementById('journalTimeline').innerHTML = days.map(ds => {
+      let entries = Store.get('journal:' + ds, null);
+      // 兼容旧格式
+      if (typeof entries === 'string') {
+        entries = [{ id: Util.uid(), text: entries, time: '--:--' }];
+      }
+      if (!Array.isArray(entries) || !entries.length) return '';
+      const label = ds === today ? '今天' : ds;
+      return `<div class="timeline-group">
+        <div class="timeline-date">${label}</div>
+        ${entries.map(e => `<div class="journal-card">
+          <div class="j-time">🕒 ${e.time}</div>
+          <div class="j-text">${Util.esc(e.text)}</div>
+        </div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+};
+/* ==== 功能：随笔 END ==== */
 
 
 /* ==== 功能：记账 START ==== */
@@ -1300,7 +1464,8 @@ const Review = {
       const ds = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
       const tasks = Store.get('things:' + ds);
       if (tasks) { totalTasks += tasks.length; doneTasks += tasks.filter(t => t.done).length; }
-      if (Store.get('journal:' + ds)) journalDays++;
+      const j = Store.get('journal:' + ds);
+      if (j && (Array.isArray(j) ? j.length > 0 : true)) journalDays++;
     }
 
     // 汇总本周记账
